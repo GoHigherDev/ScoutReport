@@ -1,12 +1,28 @@
+@import '@scoutreport/ui/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
-}
-
 body {
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--sr-bg);
+  color: var(--sr-text);
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--sr-accent);
+  outline-offset: 3px;
 }

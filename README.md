@@ -17,7 +17,9 @@ pnpm dev
 ```
 
 The web app runs at <http://localhost:3000>. Copy `.env.example` to `.env.local`
-and fill in only values for services you have configured. Do not commit secrets.
+and fill in only values for services you have configured. Set
+`NEXT_PUBLIC_SITE_URL` to the public site origin for production Open Graph links;
+it defaults to `http://localhost:3000` when left empty. Do not commit secrets.
 
 ## Contributing
 
