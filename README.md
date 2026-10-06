@@ -42,14 +42,23 @@ and CI caching/timing. GitHub Actions validates pull requests and pushes to
 | `pnpm format`                               | Format workspace files with Prettier                |
 | `pnpm format:check`                         | Check formatting                                    |
 
-## Network roles
+## Networks
 
-- **APP_CHAIN** is where ScoutReport's contracts live. Start on Chiliz Spicy
-  Testnet (chain ID `88882`) and validate there before Mainnet.
-- **DATA_CHAIN** is Chiliz Mainnet (chain ID `88888`), used read-only for real
-  Fan Token and Socios staking data.
-- The gas token is CHZ. Fan Token decimals must be read on-chain; token addresses
-  belong in verified configuration and are intentionally not included here.
+| Network              | Chain ID | HTTP RPC                                                                      | WebSocket RPC                     | Explorers                                                                                                 |
+| -------------------- | -------: | ----------------------------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Chiliz Mainnet       |  `88888` | `https://rpc.ankr.com/chiliz` (fallback: `https://chiliz-rpc.publicnode.com`) | `wss://chiliz-rpc.publicnode.com` | [Chiliscan](https://chiliscan.com), [Chiliz Scan](https://scan.chiliz.com)                                |
+| Chiliz Spicy Testnet |  `88882` | `https://spicy-rpc.chiliz.com/`                                               | `wss://spicy-rpc-ws.chiliz.com/`  | [Chiliscan Testnet](https://testnet.chiliscan.com/), [Spicy Explorer](https://spicy-explorer.chiliz.com/) |
+
+These endpoints are from the Chiliz documentation, [“Connect using RPC”](https://docs.chiliz.com/).
+Public RPCs are rate-limited; use a configured provider for production traffic.
+The RPC endpoints can be overridden with `RPC_URL_MAINNET` and
+`RPC_URL_SPICY`.
+
+**APP_CHAIN** is where ScoutReport's contracts live. Start on Spicy and validate
+there before Mainnet. **DATA_CHAIN** is Mainnet, used read-only for real Fan
+Token and Socios staking data. The gas token is CHZ. Fan Token decimals must be
+read on-chain; token addresses belong in verified configuration and are
+intentionally not included here.
 
 ## Repository map
 
