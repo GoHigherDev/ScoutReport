@@ -1,0 +1,10 @@
+{
+  "name": "@scoutreport/config",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    "./eslint": "./eslint.config.mjs",
+    "./prettier": "./prettier.json",
+    "./tsconfig/base.json": "./tsconfig.base.json"
+  }
+}

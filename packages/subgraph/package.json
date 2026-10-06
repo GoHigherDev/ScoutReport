@@ -1,0 +1,13 @@
+{
+  "name": "@scoutreport/subgraph",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "graph codegen && graph build",
+    "codegen": "graph codegen"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "0.98.1",
+    "@graphprotocol/graph-ts": "0.38.2"
+  }
+}
