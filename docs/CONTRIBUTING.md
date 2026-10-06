@@ -57,10 +57,10 @@ local Turbo task results in `.turbo`, keyed by the runner OS, Node version,
 lockfile, Turbo/Foundry configuration, workflow and commit, with a restore prefix for
 reuse across commits. No remote-cache credentials are needed.
 
-The four jobs run in parallel. Budget approximately **5–10 minutes total
-wall-clock time** for a cold run and **2–5 minutes** with warm caches; these
-are estimates, not measured GitHub Actions results. Runner queueing, downloads
-and project growth can change this. Check the Actions run's start/end times
+Measured cold run (run 37503867553): ~47 s wall-clock; jobs run in parallel:
+web+packages 42 s, subgraph 22 s, contracts 11 s, secret-scan 6 s.
+Runner queueing, downloads and project growth can change this.
+Check the Actions run's start/end times
 for actual total duration (do not sum parallel job durations). Job timeouts
 are 20 minutes for the workspace, 10 for contracts/subgraph and 5 for scanning.
 

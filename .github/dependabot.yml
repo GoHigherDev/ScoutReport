@@ -5,10 +5,10 @@ updates:
     schedule:
       interval: weekly
     commit-message:
-      prefix: 'SR-7 chore(deps)'
+      prefix: 'chore(deps)'
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     commit-message:
-      prefix: 'SR-7 chore(deps)'
+      prefix: 'chore(deps)'
