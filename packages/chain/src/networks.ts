@@ -1,11 +1,11 @@
-import { chiliz, spicy } from './chains'
+import { chiliz, spicy } from './chains.ts'
 
 export const isSupportedChainId = (chainId: number): boolean =>
   chainId === chiliz.id || chainId === spicy.id
 
 type SupportedChain = typeof chiliz | typeof spicy
 
-const getChain = (chainId: number): SupportedChain => {
+export const getChain = (chainId: number): SupportedChain => {
   if (chainId === chiliz.id) return chiliz
   if (chainId === spicy.id) return spicy
   throw new Error(`Unsupported chain ID: ${chainId}`)
