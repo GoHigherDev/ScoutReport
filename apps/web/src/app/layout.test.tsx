@@ -12,7 +12,7 @@ describe('app shell', () => {
 
     expect(markup).toContain('aria-label="ScoutReport"')
     expect(markup).toContain('>Leaderboards</a>')
-    expect(markup).toContain('>[OPTIMISER_NAME]</a>')
+    expect(markup).toContain('>Rewards Optimizer</a>')
     expect(markup).toContain('disabled="" aria-disabled="true"')
     expect(markup).toContain('>Connect wallet</button>')
     expect(markup).toContain('aria-label="Legal"')
