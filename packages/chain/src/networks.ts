@@ -12,13 +12,30 @@ const getChain = (chainId: number): SupportedChain => {
 }
 
 const getConfiguredChain = (
-  envValue: string | undefined,
+  variableName: string,
+  rawChainId: string | undefined,
   defaultChainId: number,
-): SupportedChain =>
-  getChain(envValue === undefined ? defaultChainId : Number(envValue))
+): SupportedChain => {
+  if (rawChainId === undefined || rawChainId === '')
+    return getChain(defaultChainId)
+  if (!/^\d+$/.test(rawChainId)) {
+    throw new Error(
+      `Unsupported chain ID "${rawChainId}" in ${variableName} (expected ${chiliz.id} or ${spicy.id})`,
+    )
+  }
+
+  const chainId = Number(rawChainId)
+  if (!isSupportedChainId(chainId)) {
+    throw new Error(
+      `Unsupported chain ID "${rawChainId}" in ${variableName} (expected ${chiliz.id} or ${spicy.id})`,
+    )
+  }
+  return getChain(chainId)
+}
 
 export const getAppChain = (): SupportedChain =>
   getConfiguredChain(
+    'NEXT_PUBLIC_APP_CHAIN_ID',
     typeof process === 'undefined'
       ? undefined
       : process.env.NEXT_PUBLIC_APP_CHAIN_ID,
@@ -27,6 +44,7 @@ export const getAppChain = (): SupportedChain =>
 
 export const getDataChain = (): SupportedChain =>
   getConfiguredChain(
+    'NEXT_PUBLIC_DATA_CHAIN_ID',
     typeof process === 'undefined'
       ? undefined
       : process.env.NEXT_PUBLIC_DATA_CHAIN_ID,

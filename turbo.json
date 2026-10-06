@@ -1,6 +1,13 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "agentGuidance": false,
+  "globalEnv": [
+    "RPC_URL_MAINNET",
+    "RPC_URL_MAINNET_FALLBACK",
+    "RPC_URL_SPICY",
+    "RPC_WS_URL_MAINNET",
+    "RPC_WS_URL_SPICY"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
