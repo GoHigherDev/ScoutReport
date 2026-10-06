@@ -6,6 +6,9 @@ import { NAMES } from '../copy/names'
 import './globals.css'
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
+  ),
   title: NAMES.product,
   description: NAMES.description,
   openGraph: {
@@ -81,7 +84,9 @@ export default function RootLayout({
             </nav>
             <div className="ml-auto flex items-center gap-2 sm:ml-0">
               <Badge variant="secondary">{NAMES.network}</Badge>
-              <Button type="button">{NAMES.connectWallet}</Button>
+              <Button type="button" disabled aria-disabled="true">
+                {NAMES.connectWallet}
+              </Button>
             </div>
           </div>
         </header>
