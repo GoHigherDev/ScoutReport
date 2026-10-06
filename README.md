@@ -19,6 +19,11 @@ pnpm dev
 The web app runs at <http://localhost:3000>. Copy `.env.example` to `.env.local`
 and fill in only values for services you have configured. Do not commit secrets.
 
+## Contributing
+
+Every branch, commit, and pull request title must include its Jira key from
+project SR, for example `SR-2`.
+
 ## Scripts
 
 | Command                                     | Purpose                                             |

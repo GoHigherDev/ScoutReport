@@ -2,9 +2,9 @@ node_modules/
 .pnpm-store/
 .turbo/
 .next/
+apps/web/next-env.d.ts
 dist/
 build/
-out/
 coverage/
 *.tsbuildinfo
 generated/
@@ -12,7 +12,8 @@ generated/
 .env*
 !.env.example
 
-broadcast/
-cache/
-artifacts/
-lib/
+**/broadcast/
+packages/contracts/cache/
+packages/contracts/artifacts/
+packages/contracts/lib/
+packages/contracts/out/
