@@ -24,6 +24,11 @@ and fill in only values for services you have configured. Do not commit secrets.
 Every branch, commit, and pull request title must include its Jira key from
 project SR, for example `SR-2`.
 
+See [the contributing guide](docs/CONTRIBUTING.md) for branch naming,
+conventional commits, local validation, required CI checks, the review rule
+and CI caching/timing. GitHub Actions validates pull requests and pushes to
+`main` without secrets or deployments.
+
 ## Scripts
 
 | Command                                     | Purpose                                             |
