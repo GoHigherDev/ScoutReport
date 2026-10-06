@@ -7,7 +7,7 @@ export const NAMES = {
     silver: 'Silver',
     gold: 'Gold',
   },
-  optimiser: '[OPTIMISER_NAME]',
+  optimiser: 'Rewards Optimizer',
   portfolioPage: '[PORTFOLIO_PAGE_NAME]',
   badgeShelf: '[BADGE_SHELF_NAME]',
   description: 'ScoutReport on Chiliz Chain',
