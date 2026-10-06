@@ -9,16 +9,20 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./tailwind.preset": "./tailwind.preset.ts",
+    "./tokens.css": "./src/tokens.css"
   },
   "peerDependencies": {
     "react": "19.3.0"
   },
   "devDependencies": {
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "sharp": "0.35.5"
   },
   "scripts": {
+    "generate-icons": "node scripts/generate-icons.mjs",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
