@@ -15,7 +15,8 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify-tokens": "node --experimental-strip-types scripts/verify-tokens.ts"
   },
   "dependencies": {
     "viem": "2.57.3"

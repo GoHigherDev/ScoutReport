@@ -63,6 +63,35 @@ Token and Socios staking data. The gas token is CHZ. Fan Token decimals must be
 read on-chain; token addresses belong in verified configuration and are
 intentionally not included here.
 
+### Shared chain helpers
+
+`@scoutreport/chain` exports `getPublicClient(chainId)` for memoised HTTP clients
+with Multicall3 batching on both networks. `ensureChain(walletClient, chainId)`
+checks the wallet's current chain, switches it, and adds unknown networks before
+retrying. User rejection raises `ChainSwitchRejectedError` with a readable message.
+
+`FAN_TOKENS` contains the explorer-verified Mainnet V2 NAVI and AFC addresses,
+with source URLs beside each entry. There are no official V2 deployments on
+Spicy: `getTokenAddress(token, 88882)` returns `undefined`. Config validation
+rejects missing Mainnet, empty, zero or malformed addresses; an omitted optional
+Spicy address is valid.
+
+`readTokenMeta(chainId, address)` reads `symbol()`, `name()` and `decimals()` via
+multicall. Concurrent reads are batched and successful metadata is cached per
+chain/address in memory; failed reads can be retried. Format balances with
+`formatTokenAmount(value, meta.decimals, opts)` (en-GB, bigint-safe, optional
+fraction digits/grouping) and parse ungrouped decimal strings with
+`parseTokenAmount(input, meta.decimals)`. Parsing rejects excess non-zero
+fraction digits rather than rounding silently. Expected decimals in config are
+verification assertions only, never a substitute for an on-chain read.
+
+Run `pnpm --filter chain verify-tokens` to check every available token on
+`DATA_CHAIN` (`NEXT_PUBLIC_DATA_CHAIN_ID`, Mainnet by default). The script uses
+Node 24's TypeScript support and requires RPC access; it exits non-zero on
+invalid addresses, failed reads, symbol or decimals mismatches. Spicy reports
+these tokens as unavailable without making RPC calls. Live verification is
+separate from the deterministic mocked-transport unit tests and CI builds.
+
 ## Repository map
 
 | Path                 | Purpose                                               |

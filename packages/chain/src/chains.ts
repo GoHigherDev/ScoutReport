@@ -45,6 +45,12 @@ export const chiliz = defineChain({
 
 export const spicy = defineChain({
   ...viemSpicy,
+  contracts: {
+    ...viemSpicy.contracts,
+    multicall3: {
+      address: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    },
+  },
   rpcUrls: {
     default: {
       http: [spicyRpcUrl],
