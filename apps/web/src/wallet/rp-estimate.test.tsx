@@ -120,6 +120,9 @@ beforeEach(() => {
     upgraded: false,
   }))
   vi.stubEnv('FEATURE_RP_ESTIMATE', 'false')
+  vi.stubEnv('VERCEL_ENV', 'preview')
+  vi.stubEnv('NODE_ENV', 'production')
+  vi.stubEnv('RP_ESTIMATE_LEGAL_SIGNOFF', undefined)
 })
 afterEach(() => {
   cleanup()
@@ -160,6 +163,31 @@ describe('connected-owner RP panel', () => {
       expect(mocks.read).not.toHaveBeenCalled()
     },
   )
+  it.each([
+    ['production', 'test'],
+    ['production', 'production'],
+    [undefined, 'production'],
+    ['unknown', 'production'],
+  ])(
+    'gates the production route on legal sign-off (VERCEL_ENV=%s, NODE_ENV=%s)',
+    (vercel, node) => {
+      vi.stubEnv('FEATURE_RP_ESTIMATE', 'true')
+      vi.stubEnv('VERCEL_ENV', vercel)
+      vi.stubEnv('NODE_ENV', node)
+      const { unmount } = render(<OptimiserPage />, { wrapper })
+      expect(
+        screen.queryByRole('region', { name: copy.title }),
+      ).not.toBeInTheDocument()
+      expect(mocks.read).not.toHaveBeenCalled()
+      unmount()
+      vi.stubEnv('RP_ESTIMATE_LEGAL_SIGNOFF', 'true')
+      render(<OptimiserPage />, { wrapper })
+      expect(
+        screen.getByRole('region', { name: copy.title }),
+      ).toBeInTheDocument()
+      expect(mocks.read).not.toHaveBeenCalled()
+    },
+  )
   it('renders exact approved copy and all four caveats with no financial or write controls', () => {
     render(<RpEstimatePanel rows={mocks.rows} />, { wrapper })
     expect(
@@ -185,8 +213,8 @@ describe('connected-owner RP panel', () => {
     const content = screen.getByRole('region', {
       name: copy.title,
     }).textContent!
-    expect(content.replace(NAMES.optimiserCopy.caveats[2], '')).not.toMatch(
-      /cost|price|buy|purchas|rank|extra.token|yield|APY|guaranteed/i,
+    expect(content).not.toMatch(
+      /\b(?:buy|cheapest|cost per point|best value|earn up to|yield|APY|guaranteed|return|cost|price|purchase|purchasing|rank|ranking|extra.token)\b/i,
     )
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
     expect(

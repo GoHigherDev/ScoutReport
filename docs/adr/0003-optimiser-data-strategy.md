@@ -68,6 +68,14 @@ real RP pool parameter or approve an official-data claim. The shipped calibratio
 configuration is empty and `FEATURE_RP_ESTIMATE` defaults off in every environment.
 Missing data remains unavailable, not fabricated.
 
+The latest owner decision (PR comment `6154095932`) adds a server-only production
+gate: both `FEATURE_RP_ESTIMATE` and `RP_ESTIMATE_LEGAL_SIGNOFF` must be exactly
+`true`. Production is `VERCEL_ENV=production`, or `NODE_ENV=production` unless
+`VERCEL_ENV=preview`. Vercel previews can explicitly opt in without legal
+sign-off. No geo-block is applied. CI checks every panel copy string, including
+all four caveats and templates, for the owner's banned words and phrases using
+case-insensitive whole-word matching; approved caveats remain unchanged.
+
 The panel is only for the connected owner; the Socios Wallet declaration defaults
 off and persists per address solely in browser `localStorage`, sent nowhere.
 No authentication, signing, sessions, report collection, per-profile DB

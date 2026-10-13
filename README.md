@@ -91,8 +91,12 @@ supersedes the EOA note's external-wallet inference. Link labels still require a
 
 SR-56 adds staking coverage and the read-only current-holdings RP Estimate panel.
 `FEATURE_RP_ESTIMATE` is a **server-only** flag, defaulting to `false` everywhere;
-only the exact value `true` enables the panel. `/optimiser` reads it at request
-time; Turbo includes it in its environment/cache key. No estimates or extra
+only the exact value `true` can enable the panel. Production additionally requires
+server-only `RP_ESTIMATE_LEGAL_SIGNOFF=true`. Production means
+`VERCEL_ENV=production`, or `NODE_ENV=production` unless `VERCEL_ENV=preview`;
+Vercel previews can opt in without legal sign-off. There is no geo-block.
+`/optimiser` reads these settings at request time; Turbo includes both flags,
+`VERCEL_ENV` and `NODE_ENV` in its environment/cache key. No estimates or extra
 snapshot reads run when it is off. With the flag on, users can declare that the
 connected address is their Socios Wallet. This is not identity verification.
 The declaration defaults off, is saved per address in this browser's
