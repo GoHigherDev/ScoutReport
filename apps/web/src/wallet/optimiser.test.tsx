@@ -9,8 +9,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { normaliseStake } from '@scoutreport/chain'
 import OptimiserPage from '../app/optimiser/page'
+import OptimiserLayout from '../app/optimiser/layout'
 import { NAMES } from '../copy/names'
 import type { PortfolioRow } from './hooks'
+import { OptimiserRpCaveat } from './optimiser'
 import pendingFixture from '../../../../packages/chain/src/fixtures/pending-unstakes.json'
 
 const mocks = vi.hoisted(() => ({
@@ -26,10 +28,12 @@ const mocks = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   usePortfolio: vi.fn(),
+  useWalletKind: vi.fn(),
 }))
 vi.mock('wagmi', () => ({ useConnection: () => mocks.connection }))
 vi.mock('./hooks', () => ({
   useOptimiserPortfolio: mocks.usePortfolio,
+  useWalletKind: mocks.useWalletKind,
 }))
 
 function row(key: string, held: bigint, staked: bigint): PortfolioRow {
@@ -50,12 +54,125 @@ beforeEach(() => {
   mocks.portfolio.isError = false
   mocks.portfolio.data = []
   mocks.usePortfolio.mockReturnValue(mocks.portfolio)
+  mocks.useWalletKind.mockReturnValue({ kind: undefined })
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-10-13T12:00:00Z'))
 })
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+})
+
+describe('optimiser RP caveat', () => {
+  it.each(['eoa', 'contract', undefined] as const)(
+    'renders exact account context for kind %s',
+    (kind) => {
+      mocks.useWalletKind.mockReturnValue({ kind })
+      const { asFragment } = render(<OptimiserRpCaveat />)
+      expect(asFragment()).toMatchSnapshot()
+      const copy = NAMES.optimiserCopy.rpCaveat
+      expect(screen.queryByText(copy.eoa) !== null).toBe(kind === 'eoa')
+      expect(screen.queryByText(copy.contract) !== null).toBe(
+        kind === 'contract',
+      )
+      expect(screen.getByText(copy.sociosWalletLine)).toBeInTheDocument()
+      expect(mocks.useWalletKind).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    },
+  )
+
+  it.each([
+    { kind: undefined, isPending: true, isError: false },
+    { kind: undefined, isPending: false, isError: true },
+  ])(
+    'shows only the banner when the code read is $isPending/$isError',
+    (state) => {
+      mocks.useWalletKind.mockReturnValue(state)
+      const { asFragment } = render(<OptimiserRpCaveat />)
+      expect(asFragment()).toMatchSnapshot()
+      expect(
+        screen.queryByText(NAMES.optimiserCopy.rpCaveat.eoa),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByText(NAMES.optimiserCopy.rpCaveat.contract),
+      ).not.toBeInTheDocument()
+    },
+  )
+
+  it('hides cached account context if the code read later fails', () => {
+    mocks.useWalletKind.mockReturnValue({
+      kind: 'eoa',
+      isPending: false,
+      isError: false,
+    })
+    const { rerender } = render(<OptimiserRpCaveat />)
+    expect(
+      screen.getByText(NAMES.optimiserCopy.rpCaveat.eoa),
+    ).toBeInTheDocument()
+    mocks.useWalletKind.mockReturnValue({
+      kind: 'eoa',
+      isPending: false,
+      isError: true,
+    })
+    rerender(<OptimiserRpCaveat />)
+    expect(
+      screen.queryByText(NAMES.optimiserCopy.rpCaveat.eoa),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText(NAMES.optimiserCopy.caveats[1])).toBeInTheDocument()
+  })
+
+  it.each([true, false])(
+    'keeps the banner on the optimiser page when connected=%s',
+    (isConnected) => {
+      mocks.connection.isConnected = isConnected
+      const { asFragment } = render(
+        <OptimiserLayout>
+          <OptimiserPage />
+        </OptimiserLayout>,
+      )
+      expect(asFragment()).toMatchSnapshot()
+      for (const caveat of NAMES.optimiserCopy.caveats) {
+        expect(screen.getAllByText(caveat)).toHaveLength(1)
+      }
+      expect(
+        screen.getByText(NAMES.optimiserCopy.rpCaveat.sociosWalletLine),
+      ).toBeInTheDocument()
+    },
+  )
+
+  it('keeps one banner around nested optimiser content', () => {
+    const { rerender } = render(
+      <OptimiserLayout>
+        <OptimiserPage />
+      </OptimiserLayout>,
+    )
+    const banner = screen.getByText(
+      NAMES.optimiserCopy.caveats[1],
+    ).parentElement
+    rerender(
+      <OptimiserLayout>
+        <div />
+      </OptimiserLayout>,
+    )
+    expect(screen.getByText(NAMES.optimiserCopy.caveats[1]).parentElement).toBe(
+      banner,
+    )
+    expect(screen.getAllByText(NAMES.optimiserCopy.caveats[1])).toHaveLength(1)
+  })
+
+  it('links to the exact brief sources in new tabs', () => {
+    render(<OptimiserRpCaveat />)
+    const links = screen.getAllByRole('link')
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      'https://connect.socios.com/interact-with-chiliz-chain/working-with-staking',
+      'https://helpcenter.socios.com/en/articles/472518-how-do-i-earn-reward-points',
+      'https://helpcenter.socios.com/en/articles/472529-do-i-need-fan-tokens-to-vote',
+    ])
+    for (const link of links) {
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    }
+  })
 })
 
 describe('optimiser checklist', () => {
@@ -175,7 +292,11 @@ describe('optimiser checklist', () => {
   })
 
   it('uses the approved name, Mainnet badge and exact approved caveats', () => {
-    render(<OptimiserPage />)
+    render(
+      <OptimiserLayout>
+        <OptimiserPage />
+      </OptimiserLayout>,
+    )
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       NAMES.optimiser,
     )

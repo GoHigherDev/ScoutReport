@@ -41,3 +41,31 @@ The featured wallet ID is sourced in
 Unit tests mock wagmi and the RPC client and need neither a live network nor
 a real project ID. Real-wallet/mobile checks require a configured Reown project
 and a tester's wallet; do not record credentials or private keys in QA evidence.
+
+## SR-53 optimiser RP caveat
+
+- Visit `/optimiser` while disconnected (also without a project ID), then
+  connect and disconnect. The RP warning banner and all three source links
+  remain visible throughout. Caveat 2 appears only in the banner; the other
+  three approved caveats remain unchanged in the checklist.
+- With a Mainnet EOA, check the note reads exactly: “This looks like an external
+  wallet. Staking from it does not earn Socios Reward Points.”
+- With an account containing Mainnet code, check the note reads exactly:
+  “Smart account detected (may be a Socios Wallet). If it is your Socios.com
+  Wallet, staking through the Socios app earns Reward Points. We can't confirm
+  this from the address.” Code presence, including delegated account code,
+  must never be presented as proof of wallet brand or RP eligibility.
+- Throttle or block the account-code read, including after switching accounts.
+  While loading or after failure, neither wallet-type note appears; the banner
+  remains. Disconnecting removes the note immediately.
+- Check the banner sentence reads: “Staking through the Socios.com app (Socios
+  Wallet) is what earns Socios Reward Points.” This sentence, the notes and
+  link labels are draft copy requiring Brave's approval before merge.
+- Check the Socios Connect staking guide and Help Centre RP/voting links match
+  `OPTIMISER_SOURCE_LINKS` in `apps/web/src/copy/names.ts`, open in new tabs and
+  use `rel="noopener noreferrer"`.
+- Inspect browser network traffic: account-code context uses only the existing
+  client-side public-RPC `getCode` read on DATA_CHAIN, with no new API endpoint
+  or polling. No stake, unstake, claim or signing action is offered.
+- When nested `/optimiser/*` pages are added, confirm they inherit the same
+  layout banner without mounting another copy.
