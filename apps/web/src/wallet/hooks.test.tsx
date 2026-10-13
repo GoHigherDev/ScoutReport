@@ -10,17 +10,24 @@ import {
   useWalletKind,
 } from './hooks'
 
-const { connection, batch, getBlockNumber, getCode, getPublicClient } =
-  vi.hoisted(() => ({
-    connection: {
-      address: '0x0000000000000000000000000000000000000001',
-      isConnected: true,
-    },
-    batch: vi.fn(),
-    getBlockNumber: vi.fn(),
-    getCode: vi.fn(),
-    getPublicClient: vi.fn(),
-  }))
+const {
+  connection,
+  batch,
+  cooldowns,
+  getBlockNumber,
+  getCode,
+  getPublicClient,
+} = vi.hoisted(() => ({
+  connection: {
+    address: '0x0000000000000000000000000000000000000001',
+    isConnected: true,
+  },
+  batch: vi.fn(),
+  cooldowns: vi.fn(),
+  getBlockNumber: vi.fn(),
+  getCode: vi.fn(),
+  getPublicClient: vi.fn(),
+}))
 vi.mock('wagmi', () => ({ useConnection: () => connection }))
 vi.mock('@scoutreport/chain', async (importOriginal) => {
   const original = await importOriginal<typeof import('@scoutreport/chain')>()
@@ -32,6 +39,7 @@ vi.mock('@scoutreport/chain', async (importOriginal) => {
     ],
     getPublicClient,
     readStakeDataLatestBatch: batch,
+    readPendingUnstakesBatch: cooldowns,
   }
 })
 
@@ -53,6 +61,15 @@ beforeEach(() => {
   batch.mockImplementation(async (_client, _user, addresses: string[]) =>
     addresses.map(() => successfulStake(0n, 0n)),
   )
+  cooldowns.mockImplementation(
+    async (_client, _user, tokens: { pendingAmount: bigint }[]) =>
+      tokens.map(({ pendingAmount }) => ({
+        pendingAmount,
+        releaseAt: null,
+        unstakePeriodSeconds: 604800n,
+        pendingOperationCount: 0,
+      })),
+  )
 })
 
 afterEach(() => {
@@ -69,6 +86,31 @@ function successfulStake(held: bigint, staked: bigint) {
 }
 
 describe('holdings reads', () => {
+  it('retains pending-only rows and passes existing pending amounts to the cooldown helper', async () => {
+    batch.mockImplementation(async (_client, _user, addresses: string[]) =>
+      addresses.map((_, index) => ({
+        ...successfulStake(0n, 0n),
+        ...normaliseStake(0n, 0n, 6, index === 0 ? 600000000n : 0n),
+      })),
+    )
+    const result = await readHoldings(connection.address as `0x${string}`)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      pendingAmount: 600000000n,
+      held: 0n,
+      unstaked: 0n,
+      totalScoutRating: 0n,
+      releaseAt: null,
+    })
+    expect(cooldowns.mock.calls[0][2]).toEqual([
+      {
+        token: getTokenAddress(FAN_TOKENS[0], 88888),
+        pendingAmount: 600000000n,
+      },
+    ])
+    expect(cooldowns.mock.calls[0][3]).toBe(123n)
+  })
+
   it('batches every Mainnet token, filters zeros and uses helper formatting', async () => {
     const addresses = FAN_TOKENS.flatMap((token) => {
       if (!token.addresses[88888]) return []

@@ -3,15 +3,20 @@ import {
   decodeFunctionData,
   decodeFunctionResult,
   encodeFunctionResult,
+  encodeAbiParameters,
+  encodeEventTopics,
   erc20Abi,
+  getAddress,
   multicall3Abi,
   type Abi,
   type Address,
   type Hex,
+  toHex,
 } from 'viem'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import stakingJson from '../abis/staking.json'
 import fixture from './fixtures/staking.json'
+import pendingFixture from './fixtures/pending-unstakes.json'
 import type { StakeDataResponse } from './staking.ts'
 
 const abi = stakingJson as Abi
@@ -22,6 +27,7 @@ vi.mock('./chains.ts', async (importOriginal) => {
   return {
     ...original,
     chilizTransport: custom({ request }, { retryCount: 0 }),
+    chilizLogsTransport: custom({ request }, { retryCount: 0 }),
     spicyTransport: custom({ request }, { retryCount: 0 }),
   }
 })
@@ -50,13 +56,14 @@ const setup = async (
   stake = zeroStake,
   allTokens = false,
   failedRead?: string,
+  user = fixture.wallet as Address,
+  periodSeconds = BigInt(fixture.unstakePeriodSeconds),
 ) => {
   const helpers = await import('./index.ts')
   const token = helpers.getTokenAddress(helpers.FAN_TOKENS[0], 88888)!
   const allowedTokens = (
     allTokens ? helpers.FAN_TOKENS : helpers.FAN_TOKENS.slice(0, 1)
   ).map((item) => helpers.getTokenAddress(item, 88888)!.toLowerCase())
-  const user = fixture.wallet as Address
   const calls: string[] = []
   const reply = (to: Address, data: Hex): Hex => {
     const proxy = to.toLowerCase() === helpers.STAKING_ADDRESS
@@ -80,7 +87,7 @@ const setup = async (
       return encodeFunctionResult({
         abi,
         functionName: 'unstakePeriod',
-        result: BigInt(fixture.unstakePeriodSeconds),
+        result: periodSeconds,
       })
     }
     expect(allowedTokens).toContain(to.toLowerCase())
@@ -201,12 +208,14 @@ describe('read-only Socios staking', () => {
       staked: 0n,
       unstaked: 0n,
       totalScoutRating: 0n,
+      pendingAmount: 0n,
       decimals: 18,
       formatted: {
         held: '0',
         staked: '0',
         unstaked: '0',
         totalScoutRating: '0',
+        pendingAmount: '0',
       },
     })
     expect(h.calls).toEqual(
@@ -460,12 +469,14 @@ describe('read-only Socios staking', () => {
         staked: '0',
         unstaked: '0',
         totalScoutRating: '0',
+        pendingAmount: '0',
         decimals: 18,
         formatted: {
           held: '0',
           staked: '0',
           unstaked: '0',
           totalScoutRating: '0',
+          pendingAmount: '0',
         },
         unstakePeriodSeconds: '604800',
       })
@@ -476,6 +487,401 @@ describe('read-only Socios staking', () => {
       )
     }
   })
+})
+
+describe('pending unstake event reads (offline)', () => {
+  const sample = pendingFixture.samples[0]
+  const amount = BigInt(sample.amount) * 10n ** BigInt(pendingFixture.decimals)
+  const snapshot = 38378088n
+
+  async function pendingSetup(
+    selected = sample,
+    pendingAmount = BigInt(selected.amount) * 10n ** 18n,
+    periodSeconds = BigInt(fixture.unstakePeriodSeconds),
+  ) {
+    const h = await setup(
+      pendingFixture.decimals,
+      0n,
+      { ...zeroStake, totalPendingUnstake: pendingAmount },
+      true,
+      undefined,
+      getAddress(selected.staker),
+      periodSeconds,
+    )
+    const token = h.getTokenAddress(
+      h.FAN_TOKENS.find((token) => token.key === 'AFC')!,
+      88888,
+    )!
+    return { ...h, token }
+  }
+
+  function log(
+    token: Address,
+    staker: Address,
+    eventName: 'Unstake' | 'Claim',
+    amount: bigint,
+    blockNumber: bigint,
+    releaseAt = BigInt(sample.claimableAt),
+    logIndex = 0n,
+  ) {
+    return {
+      address: '0x5ff7f9724fd477d9a07dcdb894d0ca7f8fae1501',
+      topics: encodeEventTopics({ abi, eventName, args: { staker, token } }),
+      data:
+        eventName === 'Unstake'
+          ? encodeAbiParameters(
+              [{ type: 'uint256' }, { type: 'uint256' }],
+              [amount, releaseAt],
+            )
+          : encodeAbiParameters([{ type: 'uint256' }], [amount]),
+      blockNumber: toHex(blockNumber),
+      logIndex: toHex(logIndex),
+      removed: false,
+    }
+  }
+
+  function mockLogs(logs: ReturnType<typeof log>[], fail = false) {
+    const ethCall = request.getMockImplementation()!
+    request.mockImplementation((rpc) => {
+      if (rpc.method !== 'eth_getLogs') return ethCall(rpc)
+      if (fail) throw new Error('Log read unavailable')
+      const filter = rpc.params[0]
+      return logs.filter(
+        (item) =>
+          BigInt(item.blockNumber) >= BigInt(filter.fromBlock) &&
+          BigInt(item.blockNumber) <= BigInt(filter.toBlock),
+      )
+    })
+  }
+
+  it.each(pendingFixture.samples)(
+    'reconciles the recorded $amount AFC pending-only sample',
+    async (selected) => {
+      const pendingAmount = BigInt(selected.amount) * 10n ** 18n
+      const h = await pendingSetup(selected)
+      mockLogs([
+        log(
+          h.token,
+          h.user,
+          'Unstake',
+          pendingAmount,
+          BigInt(selected.blockNumber),
+          BigInt(selected.claimableAt),
+        ),
+      ])
+      const [stake] = await h.readStakeDataLatestBatch(
+        h.client,
+        h.user,
+        [h.token],
+        { blockNumber: snapshot },
+      )
+      expect(stake).toMatchObject({
+        held: 0n,
+        staked: 0n,
+        pendingAmount,
+        totalScoutRating: 0n,
+      })
+      const [cooldown] = await h.readPendingUnstakesBatch(
+        h.client,
+        h.user,
+        [{ token: h.token, pendingAmount: stake.pendingAmount }],
+        snapshot,
+      )
+      expect(cooldown).toEqual({
+        pendingAmount,
+        releaseAt: BigInt(selected.claimableAt),
+        unstakePeriodSeconds: 604800n,
+        pendingOperationCount: 1,
+      })
+      const filters = request.mock.calls
+        .filter(([rpc]) => rpc.method === 'eth_getLogs')
+        .map(([rpc]) => rpc.params[0])
+      expect(filters).toHaveLength(5)
+      expect(BigInt(filters[0].fromBlock)).toBe(snapshot - 221760n)
+      expect(BigInt(filters.at(-1).toBlock)).toBe(snapshot)
+      for (const [index, filter] of filters.entries()) {
+        if (index > 0)
+          expect(BigInt(filter.fromBlock)).toBe(
+            BigInt(filters[index - 1].toBlock) + 1n,
+          )
+        expect(
+          BigInt(filter.toBlock) - BigInt(filter.fromBlock) + 1n,
+        ).toBeLessThanOrEqual(50000n)
+        expect(filter.address).toBe(h.STAKING_ADDRESS)
+        expect(filter.topics).toEqual([
+          [
+            encodeEventTopics({ abi, eventName: 'Unstake' })[0],
+            encodeEventTopics({ abi, eventName: 'Claim' })[0],
+          ],
+          encodeEventTopics({
+            abi,
+            eventName: 'Unstake',
+            args: { staker: h.user },
+          })[1],
+          [
+            encodeEventTopics({
+              abi,
+              eventName: 'Unstake',
+              args: { token: h.token },
+            })[2],
+          ],
+        ])
+      }
+    },
+  )
+
+  it.each(['mismatch', 'failed logs', 'missing earlier unstake'] as const)(
+    'keeps pending amounts but no release for %s',
+    async (failure) => {
+      const h = await pendingSetup()
+      mockLogs(
+        [
+          log(
+            h.token,
+            h.user,
+            failure === 'missing earlier unstake' ? 'Claim' : 'Unstake',
+            amount - 1n,
+            snapshot,
+          ),
+        ],
+        failure === 'failed logs',
+      )
+      expect(
+        await h.readPendingUnstakesBatch(
+          h.client,
+          h.user,
+          [{ token: h.token, pendingAmount: amount }],
+          snapshot,
+        ),
+      ).toEqual([
+        {
+          pendingAmount: amount,
+          releaseAt: null,
+          unstakePeriodSeconds: 604800n,
+          pendingOperationCount: 0,
+        },
+      ])
+    },
+  )
+
+  it('subtracts claims, orders releases and counts remaining operations (synthetic)', async () => {
+    const h = await pendingSetup()
+    const early = BigInt(sample.claimableAt)
+    mockLogs([
+      log(h.token, h.user, 'Unstake', 100n, snapshot - 3n, early + 100n),
+      log(h.token, h.user, 'Unstake', 200n, snapshot - 2n, early),
+      log(h.token, h.user, 'Claim', 50n, snapshot - 1n),
+    ])
+    expect(
+      await h.readPendingUnstakesBatch(
+        h.client,
+        h.user,
+        [{ token: h.token, pendingAmount: 250n }],
+        snapshot,
+      ),
+    ).toEqual([
+      {
+        pendingAmount: 250n,
+        releaseAt: early,
+        unstakePeriodSeconds: 604800n,
+        pendingOperationCount: 2,
+      },
+    ])
+  })
+
+  it('does not request logs for zero pending and bounds a short chain to genesis', async () => {
+    const h = await pendingSetup()
+    mockLogs([])
+    await h.readPendingUnstakesBatch(
+      h.client,
+      h.user,
+      [{ token: h.token, pendingAmount: 0n }],
+      snapshot,
+    )
+    expect(request.mock.calls.every(([rpc]) => rpc.method === 'eth_call')).toBe(
+      true,
+    )
+    expect(
+      await h.readPendingUnstakesBatch(h.client, h.user, [], snapshot),
+    ).toEqual([])
+    request.mockClear()
+    await h.readPendingUnstakesBatch(
+      h.client,
+      h.user,
+      [{ token: h.token, pendingAmount: amount }],
+      123n,
+    )
+    const filters = request.mock.calls.filter(
+      ([rpc]) => rpc.method === 'eth_getLogs',
+    )
+    expect(filters).toHaveLength(1)
+    expect(filters[0][0].params[0]).toMatchObject({
+      fromBlock: '0x0',
+      toBlock: '0x7b',
+    })
+  })
+
+  it('isolates incomplete claim history to its token and omits zero-pending tokens from log filters (synthetic)', async () => {
+    const h = await pendingSetup()
+    const otherToken = h.getTokenAddress(h.FAN_TOKENS[0], 88888)!
+    const zeroToken = h.getTokenAddress(h.FAN_TOKENS[2], 88888)!
+    mockLogs([
+      log(h.token, h.user, 'Claim', amount, snapshot - 3n),
+      log(h.token, h.user, 'Unstake', amount, snapshot - 2n),
+      log(otherToken, h.user, 'Unstake', 100n, snapshot - 1n),
+      log(
+        otherToken,
+        h.user,
+        'Unstake',
+        200n,
+        snapshot,
+        BigInt(sample.claimableAt) + 100n,
+      ),
+      log(otherToken, h.user, 'Claim', 100n, snapshot, 0n, 1n),
+    ])
+    const result = await h.readPendingUnstakesBatch(
+      h.client,
+      h.user,
+      [
+        { token: h.token, pendingAmount: amount },
+        { token: otherToken, pendingAmount: 200n },
+        { token: zeroToken, pendingAmount: 0n },
+      ],
+      snapshot,
+    )
+    expect(result[0].releaseAt).toBeNull()
+    expect(result[1]).toMatchObject({
+      releaseAt: BigInt(sample.claimableAt) + 100n,
+      pendingOperationCount: 1,
+    })
+    expect(result[2].releaseAt).toBeNull()
+    const filter = request.mock.calls.find(
+      ([rpc]) => rpc.method === 'eth_getLogs',
+    )![0].params[0]
+    expect(filter.topics[2]).toEqual(
+      [h.token, otherToken].map(
+        (token) =>
+          encodeEventTopics({
+            abi,
+            eventName: 'Unstake',
+            args: { token },
+          })[2],
+      ),
+    )
+    expect(h.calls.filter((call) => call === 'unstakePeriod')).toHaveLength(1)
+  })
+
+  it('does not guess a log window when the contract-wide default read fails', async () => {
+    const h = await pendingSetup()
+    mockLogs([log(h.token, h.user, 'Unstake', amount, snapshot)])
+    const reply = request.getMockImplementation()!
+    request.mockImplementation((rpc) => {
+      if (rpc.method === 'eth_call') throw new Error('Period unavailable')
+      return reply(rpc)
+    })
+    const [cooldown] = await h.readPendingUnstakesBatch(
+      h.client,
+      h.user,
+      [{ token: h.token, pendingAmount: amount }],
+      snapshot,
+    )
+    expect(cooldown.releaseAt).toBeNull()
+    expect(cooldown.unstakePeriodSeconds).toBeNull()
+    expect(
+      request.mock.calls.some(([rpc]) => rpc.method === 'eth_getLogs'),
+    ).toBe(false)
+  })
+
+  it.each([
+    [-32062, 1000n, 'Block range is too large'],
+    [-32701, 49999n, 'exceed maximum block range'],
+  ])(
+    'stops immediately on an oversized-range RPC error %i',
+    async (code, limit, message) => {
+      const h = await pendingSetup()
+      const ethCall = request.getMockImplementation()!
+      request.mockImplementation((rpc) => {
+        if (rpc.method !== 'eth_getLogs') return ethCall(rpc)
+        const filter = rpc.params[0]
+        if (BigInt(filter.toBlock) - BigInt(filter.fromBlock) + 1n > limit) {
+          throw Object.assign(new Error(message), { code })
+        }
+        return []
+      })
+      const [cooldown] = await h.readPendingUnstakesBatch(
+        h.client,
+        h.user,
+        [{ token: h.token, pendingAmount: amount }],
+        snapshot,
+      )
+      expect(cooldown).toMatchObject({
+        pendingAmount: amount,
+        releaseAt: null,
+        pendingOperationCount: 0,
+      })
+      expect(
+        request.mock.calls.filter(([rpc]) => rpc.method === 'eth_getLogs'),
+      ).toHaveLength(1)
+    },
+  )
+
+  it('reads sequentially and discards partial results on the first later error', async () => {
+    const h = await pendingSetup()
+    const ethCall = request.getMockImplementation()!
+    let resolve!: (value: ReturnType<typeof log>[]) => void
+    let reads = 0
+    request.mockImplementation((rpc) => {
+      if (rpc.method !== 'eth_getLogs') return ethCall(rpc)
+      reads++
+      if (reads > 1)
+        throw Object.assign(new Error('exceed maximum block range'), {
+          code: -32701,
+        })
+      return new Promise((done) => {
+        resolve = done
+      })
+    })
+    const result = h.readPendingUnstakesBatch(
+      h.client,
+      h.user,
+      [{ token: h.token, pendingAmount: amount }],
+      snapshot,
+    )
+    await vi.waitFor(() => expect(reads).toBe(1))
+    resolve([log(h.token, h.user, 'Unstake', amount, snapshot - 221760n)])
+    expect((await result)[0].releaseAt).toBeNull()
+    expect(reads).toBe(2)
+  })
+
+  it.each([
+    [300n, 110n, 1],
+    [604800n, 221760n, 5],
+    [1209600n, 249999n, 5],
+  ])(
+    'sizes the window from period %s with a margin and hard request budget',
+    async (periodSeconds, lookback, expectedRequests) => {
+      const h = await pendingSetup(sample, amount, periodSeconds)
+      mockLogs([])
+      await h.readPendingUnstakesBatch(
+        h.client,
+        h.user,
+        [{ token: h.token, pendingAmount: amount }],
+        snapshot,
+      )
+      const filters = request.mock.calls
+        .filter(([rpc]) => rpc.method === 'eth_getLogs')
+        .map(([rpc]) => rpc.params[0])
+      expect(filters).toHaveLength(expectedRequests)
+      expect(BigInt(filters[0].fromBlock)).toBe(snapshot - lookback)
+      expect(BigInt(filters.at(-1).toBlock)).toBe(snapshot)
+      expect(
+        filters.every(
+          (filter) =>
+            BigInt(filter.toBlock) - BigInt(filter.fromBlock) + 1n <= 50000n,
+        ),
+      ).toBe(true)
+    },
+  )
 })
 import { execFile } from 'node:child_process'
 import { createServer } from 'node:http'

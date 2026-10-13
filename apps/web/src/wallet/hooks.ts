@@ -9,11 +9,13 @@ import {
   getPublicClient,
   getTokenAddress,
   readStakeDataLatestBatch,
+  readPendingUnstakesBatch,
+  type PendingUnstake,
   type StakeBatchResult,
 } from '@scoutreport/chain'
 import type { Address } from 'viem'
 
-export type PortfolioRow = StakeBatchResult & {
+export type PortfolioRow = (StakeBatchResult & Partial<PendingUnstake>) & {
   key: string
   symbol: string
   blockNumber: bigint
@@ -38,12 +40,33 @@ export async function readHoldings(address: Address) {
     tokens.map((token) => token.address),
     { allowFailure: true, blockNumber },
   )
+  const active = tokens.flatMap((token, index) => {
+    const stake = stakes[index]
+    return stake.status === 'success' &&
+      (stake.held > 0n || stake.staked > 0n || stake.pendingAmount > 0n)
+      ? [{ token: token.address, pendingAmount: stake.pendingAmount }]
+      : []
+  })
+  const cooldowns = await readPendingUnstakesBatch(
+    client,
+    address,
+    active,
+    blockNumber,
+  )
+  let cooldownIndex = 0
   return tokens.flatMap<PortfolioRow>((token, index) => {
     const stake = stakes[index]
     const row = { key: token.key, symbol: token.symbol, blockNumber }
     if (stake.status === 'failure') return [{ ...row, ...stake }]
-    return stake.held > 0n || stake.staked > 0n
-      ? [{ ...row, ...stake, symbol: stake.meta.symbol }]
+    return stake.held > 0n || stake.staked > 0n || stake.pendingAmount > 0n
+      ? [
+          {
+            ...row,
+            ...stake,
+            ...cooldowns[cooldownIndex++],
+            symbol: stake.meta.symbol,
+          },
+        ]
       : []
   })
 }
