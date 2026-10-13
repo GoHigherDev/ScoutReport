@@ -65,7 +65,7 @@ afterEach(() => {
 
 describe('optimiser RP caveat', () => {
   it.each(['eoa', 'contract', undefined] as const)(
-    'renders exact account context for kind %s',
+    'renders exact context for known kind %s or banner only for undefined',
     (kind) => {
       mocks.useWalletKind.mockReturnValue({ kind })
       const { asFragment } = render(<OptimiserRpCaveat />)

@@ -59,13 +59,18 @@ and a tester's wallet; do not record credentials or private keys in QA evidence.
   While loading or after failure, neither wallet-type note appears; the banner
   remains. Disconnecting removes the note immediately.
 - Check the banner sentence reads: “Staking through the Socios.com app (Socios
-  Wallet) is what earns Socios Reward Points.” This sentence, the notes and
-  link labels are draft copy requiring Brave's approval before merge.
+  Wallet) is what earns Socios Reward Points.” Brave approved this sentence
+  and both notes on 13 October 2026 at 18:38 UK; link labels still require
+  approval before merge.
 - Check the Socios Connect staking guide and Help Centre RP/voting links match
   `OPTIMISER_SOURCE_LINKS` in `apps/web/src/copy/names.ts`, open in new tabs and
   use `rel="noopener noreferrer"`.
 - Inspect browser network traffic: account-code context uses only the existing
   client-side public-RPC `getCode` read on DATA_CHAIN, with no new API endpoint
-  or polling. No stake, unstake, claim or signing action is offered.
+  or polling. Leave and revisit `/optimiser`, focus the tab and reconnect
+  within 30 minutes: the same address must reuse its cached code result without
+  another read. Switching to a new address triggers one read and must not show
+  the previous account's note. No stake, unstake, claim or signing action is
+  offered.
 - When nested `/optimiser/*` pages are added, confirm they inherit the same
   layout banner without mounting another copy.

@@ -22,7 +22,7 @@ export function OptimiserRpCaveat() {
   const copy = NAMES.optimiserCopy.rpCaveat
   return (
     <RpCaveat
-      caveat={NAMES.optimiserCopy.caveats[1]}
+      caveat={copy.externalWalletCaveat}
       sociosWalletLine={copy.sociosWalletLine}
       walletTypeNote={
         kind === undefined || isPending || isError ? undefined : copy[kind]
@@ -37,7 +37,10 @@ function OptimiserCaveats() {
     <Banner variant="warning">
       <ul className="space-y-2 text-sm">
         {NAMES.optimiserCopy.caveats
-          .filter((_, index) => index !== 1)
+          .filter(
+            (caveat) =>
+              caveat !== NAMES.optimiserCopy.rpCaveat.externalWalletCaveat,
+          )
           .map((caveat) => (
             <li key={caveat}>{caveat}</li>
           ))}

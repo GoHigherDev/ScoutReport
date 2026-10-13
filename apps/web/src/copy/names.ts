@@ -1,3 +1,6 @@
+const externalWalletCaveat =
+  'Staking from an external wallet does not earn Socios Reward Points. We cannot reliably verify whether this address is a Socios Wallet or qualifies for RP.'
+
 export const NAMES = {
   product: 'ScoutReport',
   xHandle: '@xScoutReport',
@@ -28,6 +31,7 @@ export const NAMES = {
     defaultUnstakePeriod: 'Contract-wide default cooldown (seconds)',
     tokenPeriodUnknown: 'Per-token override unknown',
     rpCaveat: {
+      externalWalletCaveat,
       sociosWalletLine:
         'Staking through the Socios.com app (Socios Wallet) is what earns Socios Reward Points.',
       eoa: 'This looks like an external wallet. Staking from it does not earn Socios Reward Points.',
@@ -39,7 +43,7 @@ export const NAMES = {
     },
     caveats: [
       'ScoutReport is not affiliated with Socios. Rewards Optimizer shows available on-chain data; it cannot verify your Socios Reward Points or forecast RP yields.',
-      'Staking from an external wallet does not earn Socios Reward Points. We cannot reliably verify whether this address is a Socios Wallet or qualifies for RP.',
+      externalWalletCaveat,
       "To vote, you must own and stake at least one Fan Token of that team. Some polls require more or have additional conditions. Check the poll's requirements in Socios; an on-chain balance does not guarantee eligibility.",
       'Poll coverage may be incomplete. Times and balances reflect the stated capture block and may change. Pending unstake is not a liquid wallet balance.',
     ],

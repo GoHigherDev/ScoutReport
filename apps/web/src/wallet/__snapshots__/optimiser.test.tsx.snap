@@ -192,7 +192,7 @@ exports[`optimiser RP caveat > keeps the banner on the optimiser page when conne
 </DocumentFragment>
 `;
 
-exports[`optimiser RP caveat > renders exact account context for kind contract 1`] = `
+exports[`optimiser RP caveat > renders exact context for known kind contract or banner only for undefined 1`] = `
 <DocumentFragment>
   <div
     class="rounded-lg border-l-4 p-4 border-sr-warning bg-sr-surface text-sr-warning space-y-2 text-sm"
@@ -245,7 +245,7 @@ exports[`optimiser RP caveat > renders exact account context for kind contract 1
 </DocumentFragment>
 `;
 
-exports[`optimiser RP caveat > renders exact account context for kind eoa 1`] = `
+exports[`optimiser RP caveat > renders exact context for known kind eoa or banner only for undefined 1`] = `
 <DocumentFragment>
   <div
     class="rounded-lg border-l-4 p-4 border-sr-warning bg-sr-surface text-sr-warning space-y-2 text-sm"
@@ -298,7 +298,7 @@ exports[`optimiser RP caveat > renders exact account context for kind eoa 1`] = 
 </DocumentFragment>
 `;
 
-exports[`optimiser RP caveat > renders exact account context for kind undefined 1`] = `
+exports[`optimiser RP caveat > renders exact context for known kind undefined or banner only for undefined 1`] = `
 <DocumentFragment>
   <div
     class="rounded-lg border-l-4 p-4 border-sr-warning bg-sr-surface text-sr-warning space-y-2 text-sm"

@@ -73,8 +73,11 @@ The existing client-side `useWalletKind()` Mainnet account-code read supplies
 context only: EOA shows the external-wallet note; code presence shows the
 conditional smart-account note. Loading or failed reads show no wallet-type
 note. Neither code (including EIP-7702 delegation) nor connector choice verifies
-Socios Wallet identity or RP eligibility. The new banner sentence, both notes
-and link labels require Brave's copy approval before merge.
+Socios Wallet identity or RP eligibility. Results stay fresh indefinitely while
+cached and are retained for 30 minutes after the last observer unmounts, keyed by
+DATA_CHAIN and address. Remounts, focus and reconnects do not trigger automatic
+code reads; a new address triggers one read. Brave approved the banner sentence
+and both notes on 13 October 2026 at 18:38 UK; link labels still require approval.
 
 This is not financial advice or a promise of RP/voting eligibility. No RP
 estimates, yields, wallet-brand detection, signing/staking actions, polling or

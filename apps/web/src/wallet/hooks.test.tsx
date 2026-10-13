@@ -1,5 +1,10 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  focusManager,
+  onlineManager,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState, type ReactNode } from 'react'
 import { FAN_TOKENS, getTokenAddress, normaliseStake } from '@scoutreport/chain'
@@ -226,6 +231,56 @@ describe('holdings reads', () => {
 })
 
 describe('wallet kind on DATA_CHAIN', () => {
+  it('reuses cached account code on rerender, remount, focus and reconnect, reading each new address once', async () => {
+    const client = new QueryClient()
+    const cachedWrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    )
+    getCode.mockResolvedValueOnce('0x').mockResolvedValueOnce('0x6000')
+    try {
+      const first = renderHook(useWalletKind, { wrapper: cachedWrapper })
+      await waitFor(() => expect(first.result.current.kind).toBe('eoa'))
+      expect(getCode).toHaveBeenCalledTimes(1)
+      expect(
+        client.getQueryCache().find({
+          queryKey: ['wallet-kind', 88888, connection.address],
+        })?.gcTime,
+      ).toBe(30 * 60 * 1000)
+      first.rerender()
+      first.unmount()
+
+      const second = renderHook(useWalletKind, { wrapper: cachedWrapper })
+      expect(second.result.current.kind).toBe('eoa')
+      await act(async () => {
+        focusManager.setFocused(false)
+        focusManager.setFocused(true)
+        onlineManager.setOnline(false)
+        onlineManager.setOnline(true)
+      })
+      expect(getCode).toHaveBeenCalledTimes(1)
+
+      connection.address = '0x0000000000000000000000000000000000000002'
+      second.rerender()
+      expect(second.result.current.kind).toBeUndefined()
+      await waitFor(() => expect(second.result.current.kind).toBe('contract'))
+      second.rerender()
+      expect(getCode.mock.calls).toEqual([
+        [{ address: '0x0000000000000000000000000000000000000001' }],
+        [{ address: '0x0000000000000000000000000000000000000002' }],
+      ])
+
+      connection.address = '0x0000000000000000000000000000000000000001'
+      second.rerender()
+      expect(second.result.current.kind).toBe('eoa')
+      expect(getCode).toHaveBeenCalledTimes(2)
+      second.unmount()
+    } finally {
+      client.clear()
+      focusManager.setFocused(undefined)
+      onlineManager.setOnline(true)
+    }
+  })
+
   it.each([
     [undefined, 'eoa'],
     ['0x', 'eoa'],
