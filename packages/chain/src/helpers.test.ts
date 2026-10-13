@@ -243,10 +243,9 @@ describe('Fan Token metadata and verification', () => {
       await import('./index.ts')
     expect(() => validateTokenConfig()).not.toThrow()
     expect(getTokenAddress(FAN_TOKENS[0], 88882)).toBeUndefined()
-    expect(await verifyTokens(88882)).toEqual([
-      'NAVI: not available on chain 88882',
-      'AFC: not available on chain 88882',
-    ])
+    expect(await verifyTokens(88882)).toEqual(
+      FAN_TOKENS.map((token) => `${token.key}: not available on chain 88882`),
+    )
     expect(request).not.toHaveBeenCalled()
   })
 
@@ -301,6 +300,107 @@ describe('Fan Token metadata and verification', () => {
         },
       ]),
     ).rejects.toThrow('metadata mismatch')
+  })
+
+  it('verifies all 81 Mainnet entries with batched on-chain metadata reads', async () => {
+    const { FAN_TOKENS, verifyTokens } = await import('./index.ts')
+    const byAddress = new Map(
+      FAN_TOKENS.map((token) => [token.addresses[88888]!.toLowerCase(), token]),
+    )
+    request.mockImplementation(
+      ({ method, params }: { method: string; params: [{ data: Hex }] }) => {
+        expect(method).toBe('eth_call')
+        const { args, functionName } = decodeFunctionData({
+          abi: multicall3Abi,
+          data: params[0].data,
+        })
+        if (functionName !== 'aggregate3')
+          throw new Error('Expected aggregate3')
+        return encodeFunctionResult({
+          abi: multicall3Abi,
+          functionName,
+          result: args[0].map(({ target, callData }) => {
+            const token = byAddress.get(target.toLowerCase())!
+            const { functionName } = decodeFunctionData({
+              abi: erc20Abi,
+              data: callData,
+            })
+            const returnData =
+              functionName === 'decimals'
+                ? encodeFunctionResult({
+                    abi: erc20Abi,
+                    functionName,
+                    result: 18,
+                  })
+                : encodeFunctionResult({
+                    abi: erc20Abi,
+                    functionName: functionName === 'symbol' ? 'symbol' : 'name',
+                    result:
+                      functionName === 'symbol'
+                        ? token.symbol === 'DOJO'
+                          ? '$DOJO'
+                          : token.symbol
+                        : token.name,
+                  })
+            return { success: true, returnData }
+          }),
+        })
+      },
+    )
+    const results = await verifyTokens(88888)
+    expect(results).toHaveLength(81)
+    expect(results).toContain(
+      'DOJO: 0xb66D72efc5fD77A8F9Dc2E7c0f14304828956644 ($DOJO, 18 decimals)',
+    )
+    expect(request).toHaveBeenCalled()
+  })
+
+  it.each(['$DOJO', 'DOJO', 'OTHER'])(
+    'only accepts the approved on-chain DOJO symbol: %s',
+    async (symbol) => {
+      const { FAN_TOKENS, verifyTokens } = await import('./index.ts')
+      const dojo = FAN_TOKENS.find((token) => token.key === 'DOJO')!
+      mockMetadata(18, symbol)
+      if (symbol === '$DOJO') {
+        expect(await verifyTokens(88888, [dojo])).toHaveLength(1)
+      } else {
+        await expect(verifyTokens(88888, [dojo])).rejects.toThrow(
+          'metadata mismatch',
+        )
+      }
+    },
+  )
+
+  it('does not extend the DOJO exception to another contract, chain, ticker or decimals', async () => {
+    const { FAN_TOKENS, verifyTokens } = await import('./index.ts')
+    const dojo = FAN_TOKENS.find((token) => token.key === 'DOJO')!
+    mockMetadata(18, '$DOJO')
+    await expect(
+      verifyTokens(88888, [{ ...dojo, addresses: FAN_TOKENS[0].addresses }]),
+    ).rejects.toThrow('metadata mismatch')
+    await expect(
+      verifyTokens(88882, [
+        {
+          ...dojo,
+          addresses: { ...dojo.addresses, 88882: dojo.addresses[88888] },
+        },
+      ]),
+    ).rejects.toThrow('metadata mismatch')
+    await expect(
+      verifyTokens(88888, [{ ...dojo, symbol: 'OTHER' }]),
+    ).rejects.toThrow('metadata mismatch')
+    await expect(
+      verifyTokens(88888, [{ ...dojo, expectedDecimals: 0 }]),
+    ).rejects.toThrow('metadata mismatch')
+  })
+
+  it('rejects an on-chain decimals mismatch for DOJO', async () => {
+    const { FAN_TOKENS, verifyTokens } = await import('./index.ts')
+    const dojo = FAN_TOKENS.find((token) => token.key === 'DOJO')!
+    mockMetadata(0, '$DOJO')
+    await expect(verifyTokens(88888, [dojo])).rejects.toThrow(
+      'metadata mismatch',
+    )
   })
 })
 

@@ -117,12 +117,20 @@ export const verifyTokens = async (
       const address = getTokenAddress(token, chainId)
       if (!address) return `${token.key}: not available on chain ${chainId}`
       const meta = await readTokenMeta(chainId, address)
+      // Only the approved Mainnet DOJO contract uses $DOJO for the DOJO ticker.
+      const expectedSymbol =
+        chainId === 88888 &&
+        address.toLowerCase() ===
+          '0xb66d72efc5fd77a8f9dc2e7c0f14304828956644' &&
+        token.symbol === 'DOJO'
+          ? '$DOJO'
+          : token.symbol
       if (
-        meta.symbol !== token.symbol ||
+        meta.symbol !== expectedSymbol ||
         meta.decimals !== token.expectedDecimals
       ) {
         throw new Error(
-          `${token.key} metadata mismatch on chain ${chainId}: expected ${token.symbol}/${token.expectedDecimals}, received ${meta.symbol}/${meta.decimals}`,
+          `${token.key} metadata mismatch on chain ${chainId}: expected ${expectedSymbol}/${token.expectedDecimals}, received ${meta.symbol}/${meta.decimals}`,
         )
       }
       return `${token.key}: ${address} (${meta.symbol}, ${meta.decimals} decimals)`
