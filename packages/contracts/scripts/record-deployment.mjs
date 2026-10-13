@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -7,6 +7,16 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mockSources = {
   MockSociosStaking: 'src/mocks/MockSociosStaking.sol',
   MockFanToken: 'src/mocks/MockFanToken.sol',
+}
+const predictionSources = {
+  ScoutReportPredictions: 'src/ScoutReportPredictions.sol',
+}
+function deploymentSources(target) {
+  requireValue(
+    target === 'mocks' || target === 'predictions',
+    'Invalid deployment target',
+  )
+  return target === 'mocks' ? mockSources : predictionSources
 }
 const addressPattern = /^0x[0-9a-fA-F]{40}$/
 const hashPattern = /^0x[0-9a-fA-F]{64}$/
@@ -53,16 +63,25 @@ function constructorString(value) {
   return parsed
 }
 
-function recordName(transaction) {
+function recordName(transaction, target) {
   requireValue(
     transaction.transactionType === 'CREATE' &&
       (!transaction.additionalContracts ||
         (Array.isArray(transaction.additionalContracts) &&
           transaction.additionalContracts.length === 0)) &&
       Array.isArray(transaction.arguments),
-    'Only the allowlisted mock creations may be recorded',
+    'Only the allowlisted creations may be recorded',
   )
   const args = transaction.arguments
+  if (target === 'predictions') {
+    requireValue(
+      transaction.contractName === 'ScoutReportPredictions' &&
+        args.length === 1,
+      'Unexpected predictions constructor',
+    )
+    address(args[0])
+    return 'ScoutReportPredictions'
+  }
   if (transaction.contractName === 'MockSociosStaking') {
     requireValue(args.length === 1, 'Invalid staking constructor')
     address(args[0])
@@ -84,7 +103,12 @@ function recordName(transaction) {
 }
 
 /** Produce a public record, never copying calldata, keys or arbitrary metadata. */
-export function buildDeploymentRecord(broadcast, gitSha) {
+export function buildDeploymentRecord(broadcast, gitSha, target = 'mocks') {
+  deploymentSources(target)
+  const expectedNames =
+    target === 'mocks'
+      ? ['MockSociosStaking', 'MockFanToken18', 'MockFanToken6']
+      : ['ScoutReportPredictions']
   requireValue(
     typeof gitSha === 'string' && /^[0-9a-f]{40}$/.test(gitSha),
     'Invalid git commit hash',
@@ -95,12 +119,12 @@ export function buildDeploymentRecord(broadcast, gitSha) {
   )
   requireValue(
     Array.isArray(broadcast.transactions) &&
-      broadcast.transactions.length === 3 &&
+      broadcast.transactions.length === expectedNames.length &&
       Array.isArray(broadcast.receipts) &&
-      broadcast.receipts.length === 3 &&
+      broadcast.receipts.length === expectedNames.length &&
       Array.isArray(broadcast.pending) &&
       broadcast.pending.length === 0,
-    'Exactly three confirmed mock deployments are required',
+    'Exactly the selected confirmed deployments are required',
   )
   const receipts = new Map()
   for (const receipt of broadcast.receipts) {
@@ -127,8 +151,11 @@ export function buildDeploymentRecord(broadcast, gitSha) {
           88882,
       'Spicy transaction chain 88882 is required',
     )
-    const name = recordName(transaction)
-    requireValue(!Object.hasOwn(contracts, name), 'Duplicate mock deployment')
+    const name = recordName(transaction, target)
+    requireValue(
+      !Object.hasOwn(contracts, name),
+      'Duplicate contract deployment',
+    )
     const hash = transactionHash(transaction.hash)
     const receipt = receipts.get(hash)
     requireValue(receipt && !usedHashes.has(hash), 'Missing or reused receipt')
@@ -149,12 +176,45 @@ export function buildDeploymentRecord(broadcast, gitSha) {
     usedAddresses.add(deployedAddress)
   }
   requireValue(
-    ['MockSociosStaking', 'MockFanToken18', 'MockFanToken6'].every((name) =>
-      Object.hasOwn(contracts, name),
-    ),
-    'Missing allowlisted mock',
+    expectedNames.every((name) => Object.hasOwn(contracts, name)),
+    'Missing allowlisted contract',
   )
   return { chainId: 88882, status: 'DEPLOYED', gitSha, contracts }
+}
+
+/** Preserve other deployments, including their original source commit. */
+export function mergeDeploymentRecords(previous, current) {
+  requireValue(previous?.chainId === 88882, 'Invalid previous deployment chain')
+  const contracts = {}
+  for (const name of [
+    'MockSociosStaking',
+    'MockFanToken18',
+    'MockFanToken6',
+    'ScoutReportPredictions',
+  ]) {
+    const entry = previous.contracts?.[name]
+    if (entry == null) {
+      if (Object.hasOwn(previous.contracts ?? {}, name)) contracts[name] = null
+      continue
+    }
+    const sourceSha = entry.gitSha ?? previous.gitSha
+    requireValue(
+      typeof sourceSha === 'string' && /^[0-9a-f]{40}$/.test(sourceSha),
+      'Invalid previous source commit',
+    )
+    const deployBlock = quantity(entry.deployBlock, 'previous deployment block')
+    requireValue(deployBlock > 0, 'Unconfirmed previous deployment')
+    contracts[name] = {
+      address: address(entry.address),
+      deployBlock,
+      transactionHash: transactionHash(entry.transactionHash),
+      gitSha: sourceSha,
+    }
+  }
+  for (const [name, entry] of Object.entries(current.contracts)) {
+    contracts[name] = { ...entry, gitSha: current.gitSha }
+  }
+  return { ...current, contracts }
 }
 
 const abiFields = [
@@ -196,17 +256,24 @@ function sanitiseAbiEntry(entry, parameter = false) {
 }
 
 /** Only compiled ABI and flattened allowlisted source become verification evidence. */
-export function collectEvidence(gitSha, { readArtifact, flatten }) {
+export function collectEvidence(
+  gitSha,
+  { readArtifact, flatten },
+  target = 'mocks',
+) {
   requireValue(
     typeof gitSha === 'string' && /^[0-9a-f]{40}$/.test(gitSha),
     'Invalid git commit hash',
   )
-  const evidence = { 'commit.txt': `${gitSha}\n` }
-  for (const [name, source] of Object.entries(mockSources)) {
+  const evidence =
+    target === 'mocks'
+      ? { 'commit.txt': `${gitSha}\n` }
+      : { 'ScoutReportPredictions.commit.txt': `${gitSha}\n` }
+  for (const [name, source] of Object.entries(deploymentSources(target))) {
     const artifact = readArtifact(name)
     requireValue(
       Array.isArray(artifact?.abi) && artifact.abi.length > 0,
-      'Missing mock ABI',
+      'Missing contract ABI',
     )
     evidence[`${name}.abi.json`] = `${JSON.stringify(
       artifact.abi.map((entry) => sanitiseAbiEntry(entry)),
@@ -218,7 +285,7 @@ export function collectEvidence(gitSha, { readArtifact, flatten }) {
       typeof flattened === 'string' &&
         flattened.includes(`contract ${name}`) &&
         flattened.includes('pragma solidity'),
-      'Missing flattened mock source',
+      'Missing flattened contract source',
     )
     evidence[`${name}.flattened.sol`] = flattened
   }
@@ -226,10 +293,11 @@ export function collectEvidence(gitSha, { readArtifact, flatten }) {
 }
 
 function main() {
-  const [broadcastPath, gitSha, ...extra] = process.argv.slice(2)
+  const [broadcastPath, gitSha, target = 'mocks', ...extra] =
+    process.argv.slice(2)
   requireValue(
     broadcastPath && gitSha && extra.length === 0,
-    'Expected broadcast path and git SHA',
+    'Expected broadcast path, git SHA and optional deployment target',
   )
   const actualSha = execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: root,
@@ -239,35 +307,44 @@ function main() {
     actualSha === gitSha,
     'Evidence must match the checked-out commit',
   )
-  const record = buildDeploymentRecord(
+  let record = buildDeploymentRecord(
     JSON.parse(readFileSync(broadcastPath, 'utf8')),
     gitSha,
+    target,
   )
-  const evidence = collectEvidence(gitSha, {
-    readArtifact: (name) =>
-      JSON.parse(
-        readFileSync(
-          resolve(root, 'out', `${name}.sol`, `${name}.json`),
-          'utf8',
+  const evidence = collectEvidence(
+    gitSha,
+    {
+      readArtifact: (name) =>
+        JSON.parse(
+          readFileSync(
+            resolve(root, 'out', `${name}.sol`, `${name}.json`),
+            'utf8',
+          ),
         ),
-      ),
-    flatten: (source) =>
-      execFileSync('forge', ['flatten', source], {
-        cwd: root,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }),
-  })
+      flatten: (source) =>
+        execFileSync('forge', ['flatten', source], {
+          cwd: root,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }),
+    },
+    target,
+  )
   const deployments = resolve(root, 'deployments')
+  const recordPath = resolve(deployments, '88882.json')
+  if (existsSync(recordPath)) {
+    record = mergeDeploymentRecords(
+      JSON.parse(readFileSync(recordPath, 'utf8')),
+      record,
+    )
+  }
   const evidenceDirectory = resolve(deployments, 'evidence', '88882')
   mkdirSync(evidenceDirectory, { recursive: true })
   for (const [name, content] of Object.entries(evidence)) {
     writeFileSync(resolve(evidenceDirectory, name), content)
   }
-  writeFileSync(
-    resolve(deployments, '88882.json'),
-    `${JSON.stringify(record, null, 2)}\n`,
-  )
+  writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`)
 }
 
 if (
@@ -279,7 +356,7 @@ if (
   } catch {
     // Raw Forge/JSON errors may include sensitive broadcast input.
     console.error(
-      'Deployment record refused: check Spicy receipts, mock artifacts and commit.',
+      'Deployment record refused: check Spicy receipts, allowlisted artifacts and commit.',
     )
     process.exitCode = 1
   }

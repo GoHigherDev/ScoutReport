@@ -5,5 +5,8 @@
   "scripts": {
     "build": "forge build",
     "test": "node --test scripts/*.test.mjs && forge test"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "5.6.1"
   }
 }
