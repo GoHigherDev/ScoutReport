@@ -1,0 +1,51 @@
+enum MatchStatus {
+  Open
+  Settled
+  Voided
+}
+
+type Match @entity(immutable: false) {
+  id: ID!
+  status: MatchStatus!
+  lockTime: BigInt!
+  outcomeCount: Int!
+  result: Int
+  pointsForCorrect: BigInt!
+  predictorCount: BigInt!
+  creditedCursor: BigInt!
+  predictions: [Prediction!]! @derivedFrom(field: "match")
+}
+
+type Prediction @entity(immutable: false) {
+  id: ID!
+  match: Match!
+  user: Bytes!
+  outcome: Int!
+  correct: Boolean
+  predictorIndex: BigInt!
+  credited: Boolean!
+}
+
+type PredictorIndex @entity(immutable: true) {
+  id: ID!
+  match: Match!
+  index: BigInt!
+  prediction: Prediction!
+}
+
+type UserPoints @entity(immutable: false) {
+  id: ID!
+  seasonId: String!
+  user: Bytes!
+  total: BigInt!
+  weekly: [WeeklyPoints!]! @derivedFrom(field: "userPoints")
+}
+
+type WeeklyPoints @entity(immutable: false) {
+  id: ID!
+  userPoints: UserPoints!
+  seasonId: String!
+  user: Bytes!
+  weekStart: BigInt!
+  total: BigInt!
+}

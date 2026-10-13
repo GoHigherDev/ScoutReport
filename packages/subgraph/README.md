@@ -1,5 +1,8 @@
 # Scout Rating indexing (SR-15)
 
+The separate [predictions subgraph (SR-43)](predictions/README.md) indexes
+APP_CHAIN match, pick and points events without changing this holdings index.
+
 ScoutReport is a third-party SportFi dapp on Chiliz Chain, not affiliated with
 Socios. This subgraph reads **DATA_CHAIN = Chiliz Mainnet (88888)** independently
 of **APP_CHAIN = Spicy (88882)** until Mainnet go-live. It uses no Partner API,
