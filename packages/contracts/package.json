@@ -4,6 +4,6 @@
   "private": true,
   "scripts": {
     "build": "forge build",
-    "test": "forge test"
+    "test": "node --test scripts/*.test.mjs && forge test"
   }
 }

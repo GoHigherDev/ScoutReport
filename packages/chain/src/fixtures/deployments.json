@@ -1,0 +1,11 @@
+{
+  "chainId": 88882,
+  "status": "DEPLOYED",
+  "contracts": {
+    "MockSociosStaking": {
+      "address": "0x1111111111111111111111111111111111111111"
+    },
+    "MockFanToken18": null,
+    "MockFanToken6": { "address": "0x0000000000000000000000000000000000000000" }
+  }
+}

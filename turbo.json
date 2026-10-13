@@ -1,12 +1,17 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "agentGuidance": false,
+  "globalDependencies": ["packages/contracts/deployments/*.json"],
   "globalEnv": [
     "DATABASE_URL",
     "ADMIN_ADDRESSES",
     "NEXT_PUBLIC_APP_CHAIN_ID",
     "NEXT_PUBLIC_DATA_CHAIN_ID",
     "NEXT_PUBLIC_REOWN_PROJECT_ID",
+    "NEXT_PUBLIC_SITE_URL",
+    "NEXT_PUBLIC_SUBGRAPH_URL_PREDICTIONS",
+    "SUBGRAPH_URL_HOLDINGS",
+    "SESSION_SECRET",
     "RPC_URL_MAINNET",
     "RPC_URL_MAINNET_FALLBACK",
     "RPC_URL_SPICY",

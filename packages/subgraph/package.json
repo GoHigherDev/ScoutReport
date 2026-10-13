@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "deploy:chiliz": "node scripts/deploy.mjs chiliz",
     "build": "graph codegen && graph build",
     "codegen": "graph codegen",
-    "lint": "eslint src tests",
+    "lint": "eslint src tests scripts",
     "typecheck": "graph codegen && graph build && graph build subgraph.testnet.yaml --output-dir build/testnet",
-    "test": "graph codegen && graph test --version 0.6.0"
+    "test": "node --test scripts/*.test.mjs && graph codegen && graph test --version 0.6.0"
   },
   "devDependencies": {
     "@graphprotocol/graph-cli": "0.98.1",

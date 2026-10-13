@@ -264,7 +264,7 @@ verification. Confirm the ERC-1967 implementation against F-06 provenance.
   Compiled read ABI parity was checked against `staking.json`, excluding only
   Solidity-internal struct namespaces.
 
-[`deployments/88882.json`](../../deployments/88882.json) is deliberately
+[`packages/contracts/deployments/88882.json`](../../packages/contracts/deployments/88882.json) is deliberately
 **PENDING**, with null addresses and transaction hashes, not usable config.
 This satisfies revised **AC4 for SR-30**; populating real addresses and deploying
 the mocks are **F-11 deliverables**, not outstanding SR-30 acceptance work.

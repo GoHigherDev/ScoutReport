@@ -5,6 +5,11 @@ Socios. This subgraph reads **DATA_CHAIN = Chiliz Mainnet (88888)** independentl
 of **APP_CHAIN = Spicy (88882)** until Mainnet go-live. It uses no Partner API,
 Reward Point fields or scraping. Live hosting is SR-16, not this ticket.
 
+For SR-16's protected preview/staging setup, dispatch-only Goldsky deployment,
+server-only query URL and rollback, see the
+[deployment runbook](../../docs/runbooks/deploy.md). Goldsky supports Mainnet
+`chiliz`; Spicy remains documented only.
+
 ## Scope and accounting
 
 Only NAVI and AFC from `packages/chain/src/tokens.config.ts` are indexed.
