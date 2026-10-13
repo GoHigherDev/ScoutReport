@@ -9,9 +9,15 @@ import {
   getPublicClient,
   getTokenAddress,
   readStakeDataLatestBatch,
-  readTokenMeta,
+  type StakeBatchResult,
 } from '@scoutreport/chain'
 import type { Address } from 'viem'
+
+export type PortfolioRow = StakeBatchResult & {
+  key: string
+  symbol: string
+  blockNumber: bigint
+}
 
 export async function readHoldings(address: Address) {
   const chain = getDataChain()
@@ -20,34 +26,38 @@ export async function readHoldings(address: Address) {
   const tokens = FAN_TOKENS.flatMap((token) => {
     if (!token.addresses[chiliz.id]) return []
     const tokenAddress = getTokenAddress(token, chain.id)
-    return tokenAddress ? [{ key: token.key, address: tokenAddress }] : []
+    return tokenAddress
+      ? [{ key: token.key, symbol: token.symbol, address: tokenAddress }]
+      : []
   })
-  const [stakes, metas] = await Promise.all([
-    readStakeDataLatestBatch(
-      getPublicClient(chain.id),
-      address,
-      tokens.map((token) => token.address),
-    ),
-    Promise.all(tokens.map((token) => readTokenMeta(chain.id, token.address))),
-  ])
-  return tokens.flatMap((token, index) => {
+  const client = getPublicClient(chain.id)
+  const blockNumber = await client.getBlockNumber({ cacheTime: 0 })
+  const stakes = await readStakeDataLatestBatch(
+    client,
+    address,
+    tokens.map((token) => token.address),
+    { allowFailure: true, blockNumber },
+  )
+  return tokens.flatMap<PortfolioRow>((token, index) => {
     const stake = stakes[index]
+    const row = { key: token.key, symbol: token.symbol, blockNumber }
+    if (stake.status === 'failure') return [{ ...row, ...stake }]
     return stake.held > 0n || stake.staked > 0n
-      ? [{ key: token.key, symbol: metas[index].symbol, ...stake }]
+      ? [{ ...row, ...stake, symbol: stake.meta.symbol }]
       : []
   })
 }
 
 export function useHoldings() {
   const { address, isConnected } = useConnection()
+  return useOptimiserPortfolio(isConnected ? address : undefined)
+}
+
+export function useOptimiserPortfolio(address: Address | undefined) {
   return useQuery({
-    queryKey: [
-      'holdings',
-      getDataChain().id,
-      isConnected ? address : undefined,
-    ],
+    queryKey: ['holdings', getDataChain().id, address],
     queryFn: () => readHoldings(address!),
-    enabled: isConnected && Boolean(address),
+    enabled: Boolean(address),
     staleTime: 30_000,
     gcTime: 0,
     retry: false,

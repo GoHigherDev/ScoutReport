@@ -53,6 +53,21 @@ not identify a wallet brand. No SIWE or Partner API is included.
 
 See [the manual wallet QA matrix](docs/qa/wallet.md) for desktop/mobile checks.
 
+## Rewards Optimizer
+
+SR-51 adds `/optimiser`, using the same client-side Mainnet portfolio query as
+the holdings strip, even when APP_CHAIN is Spicy. It lists configured tokens
+with non-zero Held or Staked balances, plus unavailable rows for failed reads.
+Held and Unstaked both mean liquid `balanceOf`, not pending unstake; Staked uses
+`totalStake` and Scout Rating is Held + Staked, formatted with on-chain decimals.
+Balance/stake reads share the displayed capture block. Token metadata is cached
+and read once per token; one failed token does not discard successful rows.
+
+Liquid-only rows show the approved Socios.com staking prompt, with the four
+approved research caveats inline. This is not financial advice or a promise of
+RP/voting eligibility. No RP estimates, yields, wallet-brand detection, deep
+links or new API endpoints are included. Tests use mocked reads, never live RPC.
+
 ## Backend and local database
 
 The API uses Next.js Node.js route handlers and Drizzle with standard Postgres

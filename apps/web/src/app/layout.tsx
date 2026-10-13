@@ -84,9 +84,12 @@ export default function RootLayout({
                 <a className="rounded-sm hover:text-sr-text" href="#predict">
                   {NAMES.nav.predict}
                 </a>
-                <a className="rounded-sm hover:text-sr-text" href="#optimiser">
+                <Link
+                  className="rounded-sm hover:text-sr-text"
+                  href="/optimiser"
+                >
                   {NAMES.optimiser}
-                </a>
+                </Link>
                 <a className="rounded-sm hover:text-sr-text" href="#chat">
                   {NAMES.nav.chat}
                 </a>

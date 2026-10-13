@@ -49,6 +49,7 @@ const setup = async (
   held = 0n,
   stake = zeroStake,
   allTokens = false,
+  failedRead?: string,
 ) => {
   const helpers = await import('./index.ts')
   const token = helpers.getTokenAddress(helpers.FAN_TOKENS[0], 88888)!
@@ -135,10 +136,21 @@ const setup = async (
       return encodeFunctionResult({
         abi: multicall3Abi,
         functionName: 'aggregate3',
-        result: decoded.args[0].map(({ target, callData }) => ({
-          success: true,
-          returnData: reply(target, callData),
-        })),
+        result: decoded.args[0].map(({ target, callData }) => {
+          const proxy = target.toLowerCase() === helpers.STAKING_ADDRESS
+          const call = decodeFunctionData({
+            abi: proxy ? abi : erc20Abi,
+            data: callData,
+          })
+          const tokenAddress = proxy ? (call.args?.[1] as string) : target
+          if (
+            call.functionName === failedRead &&
+            tokenAddress?.toLowerCase() === allowedTokens[1]
+          ) {
+            return { success: false, returnData: '0x' as Hex }
+          }
+          return { success: true, returnData: reply(target, callData) }
+        }),
       })
     },
   )
@@ -276,6 +288,53 @@ describe('read-only Socios staking', () => {
     ).rejects.toThrow('token')
     expect(request).not.toHaveBeenCalled()
   })
+
+  it.each(['getStakeDataLatest', 'balanceOf', 'decimals'])(
+    'isolates a failed %s read and reads metadata once per token (synthetic)',
+    async (failedRead) => {
+      const h = await setup(
+        6,
+        1234567n,
+        { ...zeroStake, totalStake: 2000000n },
+        true,
+        failedRead,
+      )
+      const tokens = h.FAN_TOKENS.slice(0, 2).map((token) =>
+        h.getTokenAddress(token, 88888)!,
+      )
+      const results = await h.readStakeDataLatestBatch(
+        h.client,
+        h.user,
+        tokens,
+        {
+          allowFailure: true,
+          blockNumber: 38378088n,
+        },
+      )
+      expect(results[1]).toEqual({ status: 'failure' })
+      expect(results[0].status).toBe('success')
+      if (results[0].status !== 'success')
+        throw new Error('Expected available data')
+      expect(results[0].formatted).toMatchObject({
+        held: '1.234567',
+        staked: '2',
+        unstaked: '1.234567',
+        totalScoutRating: '3.234567',
+      })
+      expect(results[0].meta.decimals).toBe(6)
+      expect(h.calls.filter((name) => name === 'decimals')).toHaveLength(
+        failedRead === 'decimals' ? 1 : 2,
+      )
+      expect(
+        request.mock.calls.some(
+          ([rpc]) => rpc.params[1] === `0x${38378088n.toString(16)}`,
+        ),
+      ).toBe(true)
+      await expect(
+        h.readStakeDataLatestBatch(h.client, h.user, tokens),
+      ).rejects.toThrow()
+    },
+  )
 
   it('propagates batch RPC errors rather than returning fabricated zero holdings', async () => {
     const h = await setup()
