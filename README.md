@@ -6,6 +6,10 @@ top of Socios.com Fan Tokens. It is not affiliated with Socios.
 For NAVI/AFC indexing, deployment commands and GraphQL examples, see the
 [Scout Rating subgraph guide](packages/subgraph/README.md).
 
+For Rewards Optimizer data availability, read-only research commands and
+outstanding access/copy gates, see [SR-50 research](docs/research/optimiser-data-access.md)
+and [ADR 0003](docs/adr/0003-optimiser-data-strategy.md).
+
 For Spicy preview/staging on Vercel and the read-only Mainnet indexer, see the
 [environment matrix](docs/environments.md) and
 [deployment runbook](docs/runbooks/deploy.md). Preview/staging must retain Vercel
@@ -135,7 +139,7 @@ and CI caching/timing. GitHub Actions validates pull requests and pushes to
 | `pnpm dev`                                  | Run the Next.js web app                             |
 | `pnpm turbo run build`                      | Build all packages and apps                         |
 | `pnpm turbo run lint typecheck test build`  | Lint, typecheck, test, and build workspace projects |
-| `pnpm --filter @scoutreport/contracts test` | Run Foundry scaffold and staking mock tests          |
+| `pnpm --filter @scoutreport/contracts test` | Run Foundry scaffold and staking mock tests         |
 | `pnpm format`                               | Format workspace files with Prettier                |
 | `pnpm format:check`                         | Check formatting                                    |
 
