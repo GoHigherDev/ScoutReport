@@ -46,6 +46,13 @@ function transactionHash(value) {
   return value.toLowerCase()
 }
 
+function constructorString(value) {
+  requireValue(typeof value === 'string', 'Invalid constructor string')
+  const parsed = value.startsWith('"') ? JSON.parse(value) : value
+  requireValue(typeof parsed === 'string', 'Invalid constructor string')
+  return parsed
+}
+
 function recordName(transaction) {
   requireValue(
     transaction.transactionType === 'CREATE' &&
@@ -69,8 +76,8 @@ function recordName(transaction) {
   const decimals = quantity(args[3], 'mock decimals')
   requireValue(
     (decimals === 18 || decimals === 6) &&
-      args[1] === `[MOCK FAN TOKEN ${decimals}]` &&
-      args[2] === `MOCK${decimals}`,
+      constructorString(args[1]) === `[MOCK FAN TOKEN ${decimals}]` &&
+      constructorString(args[2]) === `MOCK${decimals}`,
     'Unexpected mock token constructor',
   )
   return `MockFanToken${decimals}`

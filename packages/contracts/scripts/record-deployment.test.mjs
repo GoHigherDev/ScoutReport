@@ -190,6 +190,31 @@ test('refuses invalid source commit hashes', () => {
   }
 })
 
+test('accepts raw and JSON-quoted constructor strings without changing the record', () => {
+  const broadcast = fixture()
+  for (const transaction of broadcast.transactions.slice(1)) {
+    transaction.arguments[1] = JSON.stringify(transaction.arguments[1])
+    transaction.arguments[2] = JSON.stringify(transaction.arguments[2])
+  }
+  assert.deepEqual(
+    buildDeploymentRecord(broadcast, gitSha),
+    buildDeploymentRecord(fixture(), gitSha),
+  )
+})
+
+test('refuses malformed and double-encoded constructor strings', () => {
+  for (const value of [
+    '"MOCK18',
+    JSON.stringify(JSON.stringify('MOCK18')),
+    JSON.stringify('OTHER'),
+    null,
+  ]) {
+    const broadcast = fixture()
+    broadcast.transactions[1].arguments[2] = value
+    assert.throws(() => buildDeploymentRecord(broadcast, gitSha))
+  }
+})
+
 test('accepts safe decimal receipt quantities and normalises hexadecimal case', () => {
   const broadcast = fixture()
   broadcast.transactions[0].contractAddress = `0x${'A'.repeat(40)}`
