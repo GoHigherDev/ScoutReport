@@ -77,6 +77,7 @@ const writeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 type HandlerOptions<T> = {
   schema?: z.ZodType<T>
+  maxBodyBytes?: number
   auth?: boolean
   rateLimiter?: RateLimiter
   rateLimitKey?: (request: Request) => string | Promise<string>
@@ -119,8 +120,48 @@ export const handler =
       if (options.schema) {
         let body: unknown
         try {
-          body = await request.json()
-        } catch {
+          if (options.maxBodyBytes !== undefined) {
+            const limit = options.maxBodyBytes
+            if (Number(request.headers.get('Content-Length')) > limit) {
+              throw new HttpError(
+                413,
+                'INVALID_REQUEST',
+                'Invalid request body',
+              )
+            }
+            const reader = request.body?.getReader()
+            const chunks: Uint8Array[] = []
+            let size = 0
+            if (reader) {
+              while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                size += value.byteLength
+                if (size > limit) {
+                  await reader.cancel()
+                  throw new HttpError(
+                    413,
+                    'INVALID_REQUEST',
+                    'Invalid request body',
+                  )
+                }
+                chunks.push(value)
+              }
+            }
+            const bytes = new Uint8Array(size)
+            let offset = 0
+            for (const chunk of chunks) {
+              bytes.set(chunk, offset)
+              offset += chunk.byteLength
+            }
+            body = JSON.parse(
+              new TextDecoder('utf-8', { fatal: true }).decode(bytes),
+            )
+          } else {
+            body = await request.json()
+          }
+        } catch (error) {
+          if (error instanceof HttpError) throw error
           throw new HttpError(400, 'INVALID_REQUEST', 'Invalid JSON body')
         }
         const parsed = options.schema.safeParse(body)
