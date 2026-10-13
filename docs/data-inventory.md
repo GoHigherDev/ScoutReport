@@ -65,3 +65,29 @@ configuration, not database fields. `ADMIN_ADDRESSES` contains admin wallets;
 keep access restricted. The committed `.env.example` contains empty placeholders
 only; Compose's password default is explicitly local-only. Health probes return
 only dependency status, do not persist probe results and do not reveal errors.
+
+## SR-56 browser-only declaration and estimates
+
+SR-56 adds no database field, session, report collection or server-side wallet
+preference. `scoutreport:rp-declaration:<lowercase connected address>` in browser
+`localStorage` contains only `true` or `false`, defaulting to false if absent or
+storage is unavailable. It is not verification and is never transmitted,
+including to RPC providers. Unchecking saves false; clearing site storage removes
+it. It remains in that browser until changed/cleared. Address switches and
+disconnects immediately hide figures; reconnecting restores only that address's
+own declaration. This local key contains a public address, still personal data.
+
+Future calibrated snapshots use the existing public Mainnet read client; wallet
+addresses are arguments to ordinary on-chain reads, not submissions of the
+declaration. Midnight/midpoint, pool/day/block-hash, wallet snapshots and upgrade
+checks are cached in bounded in-memory maps (up to 256 entries per map); they
+disappear when the browser context closes or entries are evicted. Failed reads
+are not retained as successful zeros. UI query data is address-keyed and removed
+when its last observer unmounts. No estimate snapshot requests run when the flag
+is off, the address is undeclared, or no usable calibration exists. Existing
+wallet holdings/account-context reads are unchanged.
+
+`FEATURE_RP_ESTIMATE` is server-only configuration and defaults false. The public
+calibration list is empty: no real theta, individual reports, reporter addresses,
+RP balance/history or pool values have been provided or persisted by this work.
+Only synthetic test fixtures contain illustrative RP parameters.

@@ -76,7 +76,7 @@ exports[`optimiser RP caveat > keeps the banner on the optimiser page when conne
           class="space-y-2 text-sm"
         >
           <li>
-            ScoutReport is not affiliated with Socios. Rewards Optimizer shows available on-chain data; it cannot verify your Socios Reward Points or forecast RP yields.
+            ScoutReport is not affiliated with Socios. Rewards Optimizer shows on-chain data and clearly labelled RP estimates. It cannot verify your Socios Reward Points, and your actual Reward Points may differ from any estimate or be zero.
           </li>
           <li>
             To vote, you must own and stake at least one Fan Token of that team. Some polls require more or have additional conditions. Check the poll's requirements in Socios; an on-chain balance does not guarantee eligibility.
@@ -307,7 +307,7 @@ exports[`optimiser RP caveat > keeps the banner on the optimiser page when conne
           class="space-y-2 text-sm"
         >
           <li>
-            ScoutReport is not affiliated with Socios. Rewards Optimizer shows available on-chain data; it cannot verify your Socios Reward Points or forecast RP yields.
+            ScoutReport is not affiliated with Socios. Rewards Optimizer shows on-chain data and clearly labelled RP estimates. It cannot verify your Socios Reward Points, and your actual Reward Points may differ from any estimate or be zero.
           </li>
           <li>
             To vote, you must own and stake at least one Fan Token of that team. Some polls require more or have additional conditions. Check the poll's requirements in Socios; an on-chain balance does not guarantee eligibility.
@@ -317,6 +317,46 @@ exports[`optimiser RP caveat > keeps the banner on the optimiser page when conne
           </li>
         </ul>
       </div>
+      <section
+        aria-labelledby="staking-coverage-title"
+        class="space-y-3"
+      >
+        <h2
+          class="text-xl font-semibold"
+          id="staking-coverage-title"
+        >
+          Your staking coverage
+        </h2>
+        <p>
+          Staked on 0 of 0 Fan Tokens you hold
+        </p>
+        <h3
+          class="font-semibold"
+        >
+          Your checklist
+        </h3>
+        <p>
+          No polls watched.
+        </p>
+        <ol
+          class="space-y-2"
+        >
+          <li>
+            Poll watchlists are not available yet.
+          </li>
+        </ol>
+        <a
+          class="underline"
+          href="#fan-token-checklist"
+        >
+          Open your Fan Token checklist
+        </a>
+        <p
+          class="text-sm"
+        >
+          Socios credits staking RP daily at midnight UTC (01:00 UK time).
+        </p>
+      </section>
       <p
         role="status"
       >
@@ -528,7 +568,7 @@ exports[`optimiser RP caveat > renders exact context for known kind eoa or banne
       Staking through the Socios.com app (Socios Wallet) is what earns Socios Reward Points.
     </p>
     <p>
-      This looks like an external wallet. Staking from it does not earn Socios Reward Points.
+      Externally owned account detected. Account type does not verify whether this is a Socios Wallet or qualifies for Reward Points.
     </p>
     <ul
       class="space-y-1"

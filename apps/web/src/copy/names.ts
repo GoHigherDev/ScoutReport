@@ -15,8 +15,7 @@ export const NAMES = {
     token: 'Token',
     unstaked: 'Unstaked',
     actionHint: 'Action hint',
-    notStaked:
-      'Not staked: stake in the Socios.com app to be eligible for RP and votes',
+    notStaked: 'Held but not staked; Reward Point eligibility is not verified.',
     dataNetwork: 'Reading Chiliz Mainnet data',
     connect: 'Connect your wallet to view your Fan Token checklist.',
     unavailable: 'Unavailable',
@@ -30,6 +29,43 @@ export const NAMES = {
     pendingUnstakes: 'pending unstakes; earliest release shown',
     defaultUnstakePeriod: 'Contract-wide default cooldown (seconds)',
     tokenPeriodUnknown: 'Per-token override unknown',
+    dashboard: {
+      heading: 'Your staking coverage',
+      coverage: 'Staked on {n} of {m} Fan Tokens you hold',
+      incomplete: 'Coverage unavailable: some token reads failed.',
+      actions: 'Your checklist',
+      unstaked: '{token}: held but not staked',
+      allStaked:
+        'All Fan Tokens you hold have at least one whole token staked.',
+      noPolls: 'No polls watched.',
+      watchPrompt: 'Poll watchlists are not available yet.',
+      checklist: 'Open your Fan Token checklist',
+      creditTime:
+        'Socios credits staking RP daily at midnight UTC ({time} UK time).',
+    },
+    rpEstimate: {
+      title: 'RP Estimate',
+      subtitle:
+        'Estimated Reward Points for the tokens you already hold in this wallet.',
+      perToken: 'Estimated points per token you hold',
+      range: 'Estimate: {low}–{high} RP (central {central})',
+      footnote: 'Based on {n} user reports, calibrated {date}.',
+      empty: 'Not enough reported data to estimate',
+      ineligible: 'Not eligible for an estimate',
+      declaration: 'This address is my Socios Wallet',
+      disclaimer:
+        "Estimate. This figure is ScoutReport's estimate, not data from Socios. It is calibrated from Reward Points that ScoutReport users reported, and assumes this address is a Socios Wallet. Your actual Reward Points may differ or be zero. Not financial advice.",
+      undeclared:
+        'Declare this address only if it is your Socios Wallet. This is not verification.',
+      localOnly:
+        'Your declaration stays in this browser only and is not sent anywhere.',
+      unavailable: 'Estimate unavailable: snapshot or verification failed.',
+      widened:
+        'Estimate recalibrating: the range is wider because calibration or snapshot reads are stale, a drift alert is open, or pool stake has changed.',
+      basis:
+        'The daily estimate uses stake at the last block before midnight UTC, excluding pending unstake. Per-token figures divide that estimate by your current held plus staked tokens; liquid holdings alone do not earn staking RP.',
+      refresh: 'Refresh estimate',
+    },
     earnRoutes: {
       heading: 'Socios Reward Point routes',
       description:
@@ -51,7 +87,7 @@ export const NAMES = {
       externalWalletCaveat,
       sociosWalletLine:
         'Staking through the Socios.com app (Socios Wallet) is what earns Socios Reward Points.',
-      eoa: 'This looks like an external wallet. Staking from it does not earn Socios Reward Points.',
+      eoa: 'Externally owned account detected. Account type does not verify whether this is a Socios Wallet or qualifies for Reward Points.',
       contract:
         "Smart account detected (may be a Socios Wallet). If it is your Socios.com Wallet, staking through the Socios app earns Reward Points. We can't confirm this from the address.",
       stakingLink: 'Socios Connect, Working with Staking',
@@ -59,7 +95,7 @@ export const NAMES = {
       votingLink: 'Socios Help Centre, Do I need Fan Tokens to vote?',
     },
     caveats: [
-      'ScoutReport is not affiliated with Socios. Rewards Optimizer shows available on-chain data; it cannot verify your Socios Reward Points or forecast RP yields.',
+      'ScoutReport is not affiliated with Socios. Rewards Optimizer shows on-chain data and clearly labelled RP estimates. It cannot verify your Socios Reward Points, and your actual Reward Points may differ from any estimate or be zero.',
       externalWalletCaveat,
       "To vote, you must own and stake at least one Fan Token of that team. Some polls require more or have additional conditions. Check the poll's requirements in Socios; an on-chain balance does not guarantee eligibility.",
       'Poll coverage may be incomplete. Times and balances reflect the stated capture block and may change. Pending unstake is not a liquid wallet balance.',

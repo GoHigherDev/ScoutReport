@@ -1,14 +1,16 @@
 import type { Metadata } from 'next'
 import { NAMES } from '../../copy/names'
 import { OptimiserEarnRoutes, OptimiserPortfolio } from '../../wallet/optimiser'
+import { rpEstimateEnabled } from '../../server/rp-estimate-flag'
 
 export const metadata: Metadata = { title: NAMES.optimiser }
+export const dynamic = 'force-dynamic'
 
 export default function OptimiserPage() {
   return (
     <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8 sm:px-6">
       <h1 className="text-3xl font-bold">{NAMES.optimiser}</h1>
-      <OptimiserPortfolio />
+      <OptimiserPortfolio rpEstimateEnabled={rpEstimateEnabled()} />
       <OptimiserEarnRoutes />
     </main>
   )

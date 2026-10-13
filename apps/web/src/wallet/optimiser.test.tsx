@@ -382,7 +382,7 @@ describe('optimiser checklist', () => {
     )
     expect(screen.getByText('Reading Chiliz Mainnet data')).toBeInTheDocument()
     for (const caveat of [
-      'ScoutReport is not affiliated with Socios. Rewards Optimizer shows available on-chain data; it cannot verify your Socios Reward Points or forecast RP yields.',
+      'ScoutReport is not affiliated with Socios. Rewards Optimizer shows on-chain data and clearly labelled RP estimates. It cannot verify your Socios Reward Points, and your actual Reward Points may differ from any estimate or be zero.',
       'Staking from an external wallet does not earn Socios Reward Points. We cannot reliably verify whether this address is a Socios Wallet or qualifies for RP.',
       "To vote, you must own and stake at least one Fan Token of that team. Some polls require more or have additional conditions. Check the poll's requirements in Socios; an on-chain balance does not guarantee eligibility.",
       'Poll coverage may be incomplete. Times and balances reflect the stated capture block and may change. Pending unstake is not a liquid wallet balance.',
@@ -422,7 +422,7 @@ describe('optimiser checklist', () => {
       '0',
       '1.234567',
       '1.234567',
-      'Not staked: stake in the Socios.com app to be eligible for RP and votes',
+      'Held but not staked; Reward Point eligibility is not verified.',
     ])
     expect(rows[1]).toHaveClass('bg-sr-surface')
     expect(

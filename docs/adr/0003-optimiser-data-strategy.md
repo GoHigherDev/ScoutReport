@@ -58,6 +58,55 @@ Exact downstream Jira ACs are now supplied; no story scope is inferred.
    limit or a cache. This spike adds no routes: read-only CLI scripts only.
    Future private data additionally requires authentication/consent.
 
+## SR-56 amendment: approved current-holdings estimate scope
+
+The 13 October SR-56 clarification (PR comment `6153503217`), narrowed to
+per-held-token estimates only by final PR comment `6153715318`,
+supersedes the original cost/persistence scope and the blanket RP-estimate
+exclusion above for this specific, clearly labelled model. It does not supply a
+real RP pool parameter or approve an official-data claim. The shipped calibration
+configuration is empty and `FEATURE_RP_ESTIMATE` defaults off in every environment.
+Missing data remains unavailable, not fabricated.
+
+The latest owner decision (PR comment `6154095932`) adds a server-only production
+gate: both `FEATURE_RP_ESTIMATE` and `RP_ESTIMATE_LEGAL_SIGNOFF` must be exactly
+`true`. Production is `VERCEL_ENV=production`, or `NODE_ENV=production` unless
+`VERCEL_ENV=preview`. Vercel previews can explicitly opt in without legal
+sign-off. No geo-block is applied. CI checks every panel copy string, including
+all four caveats and templates, for the owner's banned words and phrases using
+case-insensitive whole-word matching; approved caveats remain unchanged.
+
+The panel is only for the connected owner; the Socios Wallet declaration defaults
+off and persists per address solely in browser `localStorage`, sent nowhere.
+No authentication, signing, sessions, report collection, per-profile DB
+persistence, prices, costs, extra-token projections, totals, numerical ordering
+or acquisition/staking CTAs or links are included. Only estimated points per
+token currently held are displayed, in configured `FAN_TOKENS` order with stable
+token-key fallbacks for unknown tokens.
+EOA/contract code is contextual, never proof of wallet brand.
+Source-confirmed and unconfirmed SR-61 route flags remain unchanged.
+
+Future approved calibration must document theta and residual provenance, at
+least five distinct wallets and seven report days in a fourteen-day window,
+holdout error no greater than 25%, calibration date/block and an approved
+pool-drift tolerance. These gates are not RP rates. The client-only model uses
+S/T × theta at the last block strictly before midnight UTC, on-chain decimals at
+that block, and `totalStake` excluding pending unstake. Snapshot failures or
+post-calibration `Upgraded` events hide estimates until verified replacement
+calibration is supplied. External-wallet inputs and CHZ are never eligible.
+Bands use holdout log residuals ln(actual / predicted): central ×
+exp(quantile × sqrt(1 + 1 / distinct reporters)), normally P10/P90 and widened to
+P5/P95 for calibration/read age of at least 24 hours, an explicitly supplied open
+`driftAlert`, or pool drift beyond the approved tolerance. These states show
+“recalibrating”; no arbitrary automated alert policy is introduced.
+Read freshness uses snapshot read/verification time, not the midnight block
+boundary. Prior-day snapshots fail closed at midnight rather than remaining
+visible with wider bands. Non-finite results are unavailable. The internal daily
+basis is divided by current held plus staked tokens to produce the per-held-token
+estimate only. See the [implementation notes](../../README.md#rewards-optimizer).
+No new unauthenticated DB/RPC endpoint or polling is introduced. Real calibration
+and the deferred watched-poll integration require follow-up evidence.
+
 ## Alternatives considered
 
 - Partner API first: could supply discovery/catalogue metadata, but no access
