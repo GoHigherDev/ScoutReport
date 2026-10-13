@@ -23,9 +23,9 @@ they were not independently fetched in this sandbox. Distinguish:
 - **ABI evidence:** interface/types only, not implementation semantics.
 - **Pipeline evidence:** supplied public-doc and Mainnet observations in
   [SR-50 / issue #31](https://github.com/GoHigherDev/ScoutReport/issues/31).
-- **Maintainer evidence:** block-pinned SR-30 reads and the SR-50 capture
-  summary at block 38378088, linked below; raw SR-50 JSON remains inaccessible
-  in this sandbox.
+- **Maintainer evidence:** block-pinned SR-30 reads and the SR-50 inline capture
+  at block 38378088, linked below; raw log arrays are captured, not transcribed
+  (counts only).
 - **Local evidence:** offline tests and failed RPC connectivity, not live reads.
 - **UNKNOWN:** unavailable or insufficient evidence; never substitute a zero,
   fabricated response, yield, token association or approved wording.
@@ -44,7 +44,7 @@ flags, not guessed routes or numerical point-efficiency calculations.
 | Stake and per-token total stake/stakers                           | On-chain                                    | Verified staking proxy/ABI; `getStakeDataLatest` by `eth_call`, `getStake`, `getTotalStake`, `getTotalStakers` | Two-token SR-30 samples verified; SR-50 maintainer reports successful repeat reads. Not RP or all accounting semantics                                                               | [SR-30 capture](chat-staking-spike.md#maintainer-run-block-pinned-capture), [SR-50 capture](#maintainer-mainnet-capture-13-october-2026)                        | SR-51 stake/Scout Rating; SR-55 eligibility hint; SR-56 actions                                |
 | Pending unstake, claimable, locks, cooldown                       | On-chain                                    | Raw stake tuple and lifecycle events                                                                           | Pending amounts verified; non-zero matured claimable/overlaps UNKNOWN. Per-operation deadline from `Unstake.claimableAt`, not tuple                                                  | [SR-30 exact interface](chat-staking-spike.md#exact-read-interface), [ABI](../../packages/chain/abis/staking.json)                                              | SR-52 cooldown; SR-56 actions                                                                  |
 | Official Socios staking on Spicy                                  | Unknown beyond sampled address              | Official deployment evidence                                                                                   | No code at Mainnet proxy address on Spicy; alternative official deployment UNKNOWN. ScoutReport mocks are not Socios                                                                 | [SR-30 provenance](chat-staking-spike.md#evidence-and-provenance)                                                                                               | All build/test strategies                                                                      |
-| Poll question, answer IDs/text/tallies, user answer hashes        | On-chain                                    | Poll address, Survey3 ABI, public wallet address, RPC                                                          | Maintainer reports both poll probes successful; first poll has four answers/tallies and one user hash. Detailed values await accessible JSON. No exhaustive feed; tallies are not RP | [Poll guide](https://connect.socios.com/interact-with-chiliz-chain/working-with-polls), [SR-50 capture](#maintainer-mainnet-capture-13-october-2026)            | SR-54 validation; SR-55 watchlist; SR-56 coverage                                              |
+| Poll question, answer IDs/text/tallies, user answer hashes        | On-chain                                    | Poll address, Survey3 ABI, public wallet address, RPC                                                          | Both polls' answers/tallies transcribed at block 38378088; sample voter has one matched answer on the first poll and none on the second. No exhaustive feed; tallies are not RP      | [Poll guide](https://connect.socios.com/interact-with-chiliz-chain/working-with-polls), [SR-50 capture](#maintainer-mainnet-capture-13-october-2026)            | SR-54 validation; SR-55 watchlist; SR-56 coverage                                              |
 | Poll start/end, state, cap, binding/whitelist flags, quorum       | On-chain                                    | `startDate`, `endDate`, `getState`, `votingCap`, `isBinding`, `whitelistEnabled`, `getQuorum(uint8)`           | Times are on-chain; flags/cap alone do not prove a wallet can vote. Quorum scale/eligibility semantics need implementation evidence                                                  | [Survey3 provenance](#polls-survey3-interface-and-discovery)                                                                                                    | SR-54 validation; SR-55 close time/eligibility hint                                            |
 | Exhaustive poll discovery, team/token association                 | Partner API / unknown completeness on-chain | `GET /polls`, approved API access; otherwise curated addresses or bounded logs/explorer                        | Vote logs miss polls with no votes. No factory shown by sampled creations; token/team UNKNOWN for both samples                                                                       | [Poll endpoints](https://connect.socios.com/partner-api/api-reference/polls-api/polls-api-endpoints), [creation evidence](#discovery-without-partner-api)       | SR-54 curated registry; SR-55 watchlist; SR-56 coverage; SR-57 source interface                |
 | Poll answer images/media                                          | Partner API / off-chain                     | Approved API or separately licensed metadata                                                                   | Not on-chain according to guide (May 2025); no media responses observed                                                                                                              | [Poll guide](https://connect.socios.com/interact-with-chiliz-chain/working-with-polls)                                                                          | No supplied AC requires media; SR-57 dossier limitation                                        |
@@ -179,40 +179,130 @@ First poll public voter: `0x57263860374550da427dad543439165e1540e29c`,
 [vote transaction](https://chiliscan.com/tx/0x7915fc3e326528a7a9d0c1238f773db481345032da4d1ef117d580163af97ef4),
 block **38377562**. `getUserAnswers` returned
 `0xecda680559ebdf992deda1fad2bcb17c3709333161f6c82c78ec345b646c988f`.
-The matching answer ID/text is UNKNOWN here until the detailed capture is accessible.
+The later block-38378088 capture below matches this hash to answer ID
+`2052a831-aceb-49d4-840d-77b3cba0b5d9`, text `Arcade\games night`.
 On-chain **open/close times exist**; answer media is off-chain (guide, May 2025).
 
 ### Maintainer Mainnet capture, 13 October 2026
 
-Provenance: [maintainer answer on PR #32](https://github.com/GoHigherDev/ScoutReport/pull/32#issuecomment-6148508386),
+Provenance: [maintainer summary on PR #32](https://github.com/GoHigherDev/ScoutReport/pull/32#issuecomment-6148508386)
+and [inline capture](https://github.com/GoHigherDev/ScoutReport/pull/32#issuecomment-6148857196),
 running the committed `all.ts` at head **dbd7b72** against
 `https://rpc.chiliz.com`. The maintainer reports **103/103 reads ok**,
 `blocked: null`. This is maintainer-run evidence, not a successful sandbox run.
 
-| Capture field                                 | Maintainer-reported value                                                                                             |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Chain ID                                      | `88888`                                                                                                               |
-| Block number                                  | `38378088`                                                                                                            |
-| Block hash                                    | `0x9fe4bcf8f7c5936d0119db1f228404a031b3256f778cf3a81d274dca4c53c7f0`                                                  |
-| Block timestamp (Unix seconds)                | `1791903563`                                                                                                          |
-| `staking.unstakePeriod`                       | `604800` seconds                                                                                                      |
-| `staking.MAX_UNSTAKE_PERIOD_SEC`              | `1209600` seconds                                                                                                     |
-| First poll (`0xc145…8747`)                    | Question “Vegas LAN Activity - You Choose”; four answers with tallies; one `getUserAnswers` hash for the sample voter |
-| Second poll (`0x51f5…cf53`) and wallet probes | Succeeded per maintainer; detailed values not included in the comment                                                 |
+| Capture field                    | Maintainer-reported value                                            |
+| -------------------------------- | -------------------------------------------------------------------- |
+| Chain ID                         | `88888`                                                              |
+| Block number                     | `38378088`                                                           |
+| Block hash                       | `0x9fe4bcf8f7c5936d0119db1f228404a031b3256f778cf3a81d274dca4c53c7f0` |
+| Block timestamp (Unix seconds)   | `1791903563`                                                         |
+| `capturedAt`                     | `2026-10-13T14:59:34.089Z`                                           |
+| `staking.unstakePeriod`          | `604800` seconds                                                     |
+| `staking.MAX_UNSTAKE_PERIOD_SEC` | `1209600` seconds                                                    |
 
-Full capture supplied as a
-[secret gist](https://gist.github.com/GoHigherDev/5e71ef0fec763139d1f0b83732b5edb8),
-not copied into the repository. On this follow-up, the gist page failed DNS
-resolution and GitHub's gist API returned HTTP 403. Consequently, the comment
-summary confirms successful reads, but **answer IDs/text, individual
-`totalVotes`/`totalTokens`, matched user answer and per-wallet code hashes
-remain UNKNOWN in this document** until the JSON can be read. The pipeline's
-774 voters, dates and user hash above remain separately attributed historical
-observations, not values asserted at block 38378088.
+The original [gist](https://gist.github.com/GoHigherDev/5e71ef0fec763139d1f0b83732b5edb8)
+failed DNS resolution / GitHub gist API HTTP 403 here; the maintainer then
+supplied the same capture inline. All **103 read statuses are `ok`** in that
+inline evidence. Every non-log read is complete; log arrays are count-only.
+Tables below transcribe that public evidence, not a new sandbox RPC capture.
 
-The maintainer need not rerun the probes: an accessible copy of the existing
-JSON on the PR will resolve this transcription gap. No new live data, zero
-values, answer text or wallet hash is inferred from “103/103 reads ok”.
+#### Staking samples at block 38378088
+
+Both tokens returned `decimals()` **18**. Amounts in this table are formatted
+token amounts using those observed decimals, not hardcoded decimals or RP.
+
+| Token / public staker                             | Held = Unstaked (liquid) | Staked = `totalStake` = `totalUnstakable` | `totalPendingUnstake` | Scout Rating |
+| ------------------------------------------------- | ------------------------ | ----------------------------------------- | --------------------- | ------------ |
+| NAVI `0x2bda90268064f289df62dd48c9b7a48fb9d9383b` | 0                        | 2                                         | 0                     | 2            |
+| AFC `0xf2f267dbe597eb029e44359ca4e14ec991c88cc2`  | 0                        | 3,044.41                                  | 0                     | 3,044.41     |
+| AFC `0xfea00bddbf1dd40300f9739b933c0070b004049d`  | 0                        | 0                                         | 600                   | 0            |
+| AFC `0xe57316b95c3b2f1daac76e907705469e30af57e9`  | 0                        | 0                                         | 300                   | 0            |
+
+In all four samples, `totalLocked`, `totalLockedFlexible`, `totalClaimable`,
+`totalExemptFromCooldownPeriod` and `getClaimableStake` were zero.
+`getStakeData(...,true)` matched `getStakeDataLatest(...,true)`; `getStake`
+matched `totalStake`. Latest reads with `false` returned the same scalar
+fields and `totalLockedPerEventType: []`; `true` returned `[0,0]`.
+This confirms flag behaviour for these samples only, not array meanings or
+general accounting equivalence. Pending amounts remain outside liquid
+Unstaked and Scout Rating; no non-zero matured claimable was observed.
+
+Aggregate `getTotalStake` raw units / `getTotalStakers`: NAVI
+`264000000000000000000` / `15`; AFC
+`258599124896023207189544` / `3813` (same in each AFC sample).
+Neither aggregate supplies an RP pool or RP-eligible denominator.
+
+#### Poll metadata at block 38378088
+
+Poll A = `0xc145fea14431b05f4048e13ef679079b6ff38747`;
+poll B = `0x51f5b6fa10146420c2445017e02c9f4a8d31cf53`.
+Team/token association remains **UNKNOWN** for both.
+
+| View                       | Poll A                                 | Poll B                                                   |
+| -------------------------- | -------------------------------------- | -------------------------------------------------------- |
+| `question`                 | Vegas LAN Activity - You Choose        | Who do you want to be the guest in our next Discord Q&A? |
+| `questionId`               | `d6cb0dd7-36c0-4e56-a704-135278e1ea7f` | `a5315c63-80b3-4bc4-8018-2215ae6050f8`                   |
+| `startDate` (Unix seconds) | `1791532800`                           | `1790589600`                                             |
+| `endDate` (Unix seconds)   | `1791964800`                           | `1791194400`                                             |
+| `getState`                 | `true`                                 | `true`                                                   |
+| `isBinding`                | `true`                                 | `true`                                                   |
+| `votingCap` (raw)          | `1000000000000000000`                  | `1000000000000000000`                                    |
+| `getTotalVoters`           | `774`                                  | `406`                                                    |
+| `getTotalOwners`           | `138`                                  | `316`                                                    |
+| `getTotalTokensUsed` (raw) | `774000000000000000000`                | `406000000000000000000`                                  |
+| `whitelistEnabled`         | `false`                                | `false`                                                  |
+| `getQuorum(0)`             | `19`                                   | `25`                                                     |
+
+Do not interpret `getState: true` as proof a poll is currently open:
+poll B's recorded end time precedes the capture timestamp despite that
+returned state. Preserve the view value alongside the dates; contract-state
+semantics are not independently verified.
+
+#### Answer contents and tallies at block 38378088
+
+`totalVotes` and `totalTokens` below are the verbatim raw values.
+Do not format poll weights/tokens with assumed token decimals or convert
+them to RP. `getAnswer(i's id)` and `getAnswerIdsByIndex(i)` matched every
+`getAnswers()` entry in the displayed order.
+
+| Poll / index | Answer ID                              | Answer text (verbatim)             | `totalVotes` | `totalTokens` (raw)     |
+| ------------ | -------------------------------------- | ---------------------------------- | ------------ | ----------------------- |
+| A / 0        | `3e84f68d-34a1-46ee-86a4-b0de3787ca00` | Team dinner at a famous restaurant | `246`        | `246000000000000000000` |
+| A / 1        | `a2896c61-44fb-4a51-80f6-c08ceb39cdd4` | Movie night in hotel room          | `139`        | `139000000000000000000` |
+| A / 2        | `08d13f85-409a-4c44-9efe-0c5b8c591d0b` | Unlucky picks dinner spot          | `148`        | `148000000000000000000` |
+| A / 3        | `2052a831-aceb-49d4-840d-77b3cba0b5d9` | `Arcade\games night`               | `241`        | `241000000000000000000` |
+| B / 0        | `cf2e3522-0e38-4835-8e5a-c54cd12299a8` | Natsumi                            | `79`         | `79000000000000000000`  |
+| B / 1        | `edfc2516-473a-4106-b9cb-cbbdbf389079` | Topson                             | `63`         | `63000000000000000000`  |
+| B / 2        | `166634d9-bd24-4711-832b-ec6c8c71cbf9` | SSS                                | `64`         | `64000000000000000000`  |
+| B / 3        | `28ab21be-74ac-41d0-a74d-50a63b0b836d` | OneJey                             | `70`         | `70000000000000000000`  |
+| B / 4        | `8bf3138d-e848-405b-a651-65f8ab6e5fbe` | skem                               | `52`         | `52000000000000000000`  |
+| B / 5        | `26c8c1da-8acb-4cdc-9b1a-9c50f9f5385e` | Coach kaffs                        | `78`         | `78000000000000000000`  |
+
+For public voter `0x57263860374550da427dad543439165e1540e29c`:
+
+- Poll A `getUserAnswers` returned
+  `["0xecda680559ebdf992deda1fad2bcb17c3709333161f6c82c78ec345b646c988f"]`.
+  `matchedUserAnswers` maps it to ID `2052a831-aceb-49d4-840d-77b3cba0b5d9`,
+  text `Arcade\games night`, `totalVotes: 241`,
+  `totalTokens: 241000000000000000000`.
+  `getUserVoteByAnswer` returned `(index,weight,blockNumber)` =
+  `("0","1000000000000000000","38377562")`. Its returned `index: 0` is not
+  the answer's position 3 in `getAnswers`; no index semantics are inferred.
+- Poll B `getUserAnswers` and `matchedUserAnswers` both returned `[]`.
+  No `getUserVoteByAnswer` call was needed for an empty user-answer list.
+  A successful empty list supports Not voted for this sampled address/poll
+  at this block, not Unknown or a claim about other addresses/polls.
+
+#### Log summaries: captured, not transcribed
+
+| Read                     | Count supplied | Treatment                                                     |
+| ------------------------ | -------------- | ------------------------------------------------------------- |
+| `staking.recentEvents`   | `112`          | Captured, not transcribed; raw array omitted for comment size |
+| `poll.discoveryVoteLogs` | `126`          | Captured, not transcribed; raw array omitted for comment size |
+
+Only counts are supplied here. No event payload, candidate address list,
+deduplication, factory evidence or complete history is inferred from them.
 
 ### Discovery without Partner API
 
@@ -329,11 +419,26 @@ public SR-30 stakers and the supplied public voter. Output records presence,
 byte length, `keccak256(runtimeCode)` and a possible EIP-7702 delegation
 designator, always with `sociosWallet: UNKNOWN`.
 
-Local RPC connectivity failed before chain verification. The maintainer reports
-successful wallet probes at block 38378088, but their code/hash values are only
-in the inaccessible JSON; no brand-labelled comparison is available.
-Confidence in a reliable
-Socios identifier: **insufficient**. A non-empty code result does not prove a
+Local RPC connectivity failed before chain verification. The
+[inline maintainer capture](https://github.com/GoHigherDev/ScoutReport/pull/32#issuecomment-6148857196)
+supplies these results at **block 38378088**:
+
+| Public address                               | `hasCode` | `byteLength` | `delegationDesignator` | `sociosWallet` |
+| -------------------------------------------- | --------- | ------------ | ---------------------- | -------------- |
+| `0x2bda90268064f289df62dd48c9b7a48fb9d9383b` | `true`    | `90`         | `false`                | `UNKNOWN`      |
+| `0xf2f267dbe597eb029e44359ca4e14ec991c88cc2` | `true`    | `90`         | `false`                | `UNKNOWN`      |
+| `0xfea00bddbf1dd40300f9739b933c0070b004049d` | `true`    | `90`         | `false`                | `UNKNOWN`      |
+| `0xe57316b95c3b2f1daac76e907705469e30af57e9` | `true`    | `90`         | `false`                | `UNKNOWN`      |
+| `0x57263860374550da427dad543439165e1540e29c` | `true`    | `90`         | `false`                | `UNKNOWN`      |
+
+All five returned the same runtime code hash:
+`0xeb943ca16c0a3d8c19be2c02105552f49d4ff1d02fb80b199b613f085c8c7847`.
+The code bytes themselves are not returned by these probes; no implementation,
+owner or brand provenance is established. There is no labelled positive/
+negative comparison, and no empty-code control in this sample.
+
+Confidence in a reliable Socios identifier: **insufficient** despite the shared
+hash. A non-empty code result does not prove a
 Socios SCA (other smart wallets and delegated accounts exist). Empty code does
 not attest app account status; shared proxy runtime can hide differing
 implementations/owners. Upgrades, counterfactual wallets and unlabelled samples
@@ -347,7 +452,10 @@ and false-positive/negative tests, or authenticated consent-based evidence.
 
 ## Caveat copy
 
-**Draft, pending Brave's approval.** Not approved UI copy and not wired into UI.
+**Approved as drafted by Brave**, with no edits, **13 October 2026, 16:04 UK**.
+Provenance: [product-owner approval recorded by the maintainer](https://github.com/GoHigherDev/ScoutReport/pull/32#issuecomment-6148594790),
+confirmed in the [inline-capture instruction](https://github.com/GoHigherDev/ScoutReport/pull/32#issuecomment-6148857196).
+The four caveats below are unchanged and are not wired into UI by this spike.
 
 > ScoutReport is not affiliated with Socios. Rewards Optimizer shows available
 > on-chain data; it cannot verify your Socios Reward Points or forecast RP yields.
@@ -362,8 +470,9 @@ and false-positive/negative tests, or authenticated consent-based evidence.
 > Poll coverage may be incomplete. Times and balances reflect the stated capture
 > block and may change. Pending unstake is not a liquid wallet balance.
 
-Brave's approval is an outstanding acceptance gate; this spike does not claim
-AC7 approved. No extra user-facing product names or copy constants are added.
+**AC7 is met on the recorded approval.** This approves the four caveats as
+worded, not a wallet-brand detection method, live RP feed or extra UI copy.
+No extra user-facing product names or copy constants are added.
 
 ## Go / no-go / fallback: R-02–R-08 and SR-61
 
@@ -371,17 +480,17 @@ Source: exact Jira ACs in the
 [maintainer answer](https://github.com/GoHigherDev/ScoutReport/pull/32#issuecomment-6148508386),
 13 October 2026. All stories are **To Do**, not implemented here. GO below means
 the stated data dependency is supported, not permission to start parked work,
-claim unapproved copy, change scope or bypass the R-01 completion gate.
-Brave's caveat approval remains pending.
+change scope or bypass the R-01 completion gate. The four caveats are now
+approved; any new or altered user-facing wording still requires approval.
 
 | Story / supplied scope                                 | Data decision and remaining gate                                                                                                                                             | AC-backed implementation boundary / fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| R-02 / SR-51 — Held/Staked/Unstaked checklist          | **GO for confirmed fields**; approved RP banner still pending                                                                                                                | Per configured token, `balanceOf` = Held and existing Unstaked (liquid balance, not pending); `totalStake` = Staked; Scout Rating = Held + Staked. Format with on-chain decimals; DATA_CHAIN Mainnet even with APP_CHAIN Spicy; network badge. Held > 0 and Staked = 0 may prompt staking in Socios for RP/voting, not promise eligibility. Use approved `NAMES.optimiser` (“Rewards Optimizer”), not Jira's stale placeholder; neutral `/optimiser`. No RP/day, £/RP, APY or pool-size figures. |
+| R-02 / SR-51 — Held/Staked/Unstaked checklist          | **GO for confirmed fields and approved caveats**                                                                                                                             | Per configured token, `balanceOf` = Held and existing Unstaked (liquid balance, not pending); `totalStake` = Staked; Scout Rating = Held + Staked. Format with on-chain decimals; DATA_CHAIN Mainnet even with APP_CHAIN Spicy; network badge. Held > 0 and Staked = 0 may prompt staking in Socios for RP/voting, not promise eligibility. Use approved `NAMES.optimiser` (“Rewards Optimizer”), not Jira's stale placeholder; neutral `/optimiser`. No RP/day, £/RP, APY or pool-size figures. |
 | R-03 / SR-52 — Unstaking cooldown                      | **GO for pending/cooldown evidence**, not Won't Do: SR-30 has non-zero pending amounts and `Unstake.claimableAt`; SR-50 repeats successful reads and seven-day global period | Read-only per-token pending/cooling state and event-derived release in Europe/London; offline fixtures from recorded SR-30 samples. Global period is known, per-token overrides remain UNKNOWN: do not present global period as a verified effective override. Reconcile Unstake/Claim history for current releases; no invented deadline from the tuple. Display unknown/unavailable when history or effective period cannot be resolved, rather than promise a release.                        |
-| R-04 / SR-53 — Socios Wallet RP caveat                 | **GO for caveat strategy/account-code context; NO-GO for brand identification**. Approved findings/copy still gated on Brave                                                 | Persistent RpCaveat must explain external-wallet stake ≠ Socios RP and Socios Wallet staking earns RP, with cited Help/Connect links and snapshot tests. EOA vs contract-account notes must be contextual, not proof of Socios brand/eligibility; account code can include delegation. Never assert IS Socios Wallet. Keep draft text out of UI until approved.                                                                                                                                  |
+| R-04 / SR-53 — Socios Wallet RP caveat                 | **GO for approved caveats/account-code context; NO-GO for brand identification**                                                                                             | Persistent RpCaveat must explain external-wallet stake ≠ Socios RP and Socios Wallet staking earns RP, with cited Help/Connect links and snapshot tests. EOA vs contract-account notes must be contextual, not proof of Socios brand/eligibility; account code can include delegation. Never assert IS Socios Wallet. Use the four approved caveats; additional or changed wording needs approval.                                                                                               |
 | R-05 / SR-54 — Curated poll registry                   | **GO for curated strategy; PARKED until after Brave's test**                                                                                                                 | Survey3 view validation on DATA_CHAIN; `poll_registry` CRUD at `/admin/polls` under SIWE + allowlist, audited changes, required `source_note`. Public `GET /api/polls` must have cache or rate limit before exposure. No Partner API/scraping; no evidenced factory to mandate an indexer. Sample token/team associations remain UNKNOWN: curate/verify rather than infer them from question text.                                                                                               |
-| R-06 / SR-55 — Poll watchlist + getUserAnswers         | **GO for views and on-chain close times; PARKED until after Brave's test**                                                                                                   | Voted/Not voted/Unknown from successful/failed user-answer reads; hash-match IDs; close time from `endDate`. Eligibility hint ≥1 whole staked token uses decimals and a verified team-token association, with higher-threshold/additional-condition caveat. If token mapping/read is missing, show Unknown, not eligibility. Qualitative RP note only; no Partner API required. Detailed sample answer fixture transcription awaits accessible JSON.                                             |
-| R-07 / SR-56 — Dashboard coverage/actions/empty states | **GO for spike-backed information only**; dependent stories, scheduling and approved copy still gate delivery                                                                | Coverage widget, ordered actions and empty states must distinguish curated/unknown coverage and failed reads. Midnight UTC note is a supplied accounting-mechanism statement, not a computed credit: UK equivalent is 00:00 GMT / 01:00 BST depending on date. No yields, Token Hunt or games; no assumed earn routes or RP balance.                                                                                                                                                             |
+| R-06 / SR-55 — Poll watchlist + getUserAnswers         | **GO for views and on-chain close times; PARKED until after Brave's test**                                                                                                   | Voted/Not voted/Unknown from successful/failed user-answer reads; hash-match IDs; close time from `endDate`. Eligibility hint ≥1 whole staked token uses decimals and a verified team-token association, with higher-threshold/additional-condition caveat. If token mapping/read is missing, show Unknown, not eligibility. Qualitative RP note only; no Partner API required. Inline evidence supplies one matched answer and one empty user-answer list for offline fixtures.                 |
+| R-07 / SR-56 — Dashboard coverage/actions/empty states | **GO for spike-backed information only**; dependent stories and scheduling still gate delivery                                                                               | Coverage widget, ordered actions and empty states must distinguish curated/unknown coverage and failed reads. Midnight UTC note is a supplied accounting-mechanism statement, not a computed credit: UK equivalent is 00:00 GMT / 01:00 BST depending on date. No yields, Token Hunt or games; no assumed earn routes or RP balance. The four caveats are approved, not all future dashboard wording.                                                                                            |
 | R-08 / SR-57 — Partner API dossier + disabled adapter  | **GO for dossier and source abstraction/stub; NO-GO for live Partner API access**                                                                                            | `docs/partner-api/application.md` checklist; `PollsSource`, active `CuratedRegistrySource`, `PartnerApiSource` stub behind `FEATURE_PARTNER_API=false`; environment names with empty values. No fake Socios responses, signup, credentials or unapproved live calls. Indie access remains UNKNOWN; actual adapter activation requires confirmed access/terms.                                                                                                                                    |
 | SR-61 — Point-efficiency route flags                   | **GO only for independently source-confirmed route flags; NO-GO for unconfirmed Fan Zone/other earn routes or numerical efficiency**                                         | Actual AC asks for confirmed flags, not live RP calculations. Cite R-01 or official Socios/Chiliz evidence per route. No confirming Fan Zone source was supplied, so do not flag it as confirmed; no guessed Token Hunt/game/CHZ RP routes. External-wallet staking must not be presented as RP earning. Omit/mark unconfirmed routes; no fabricated RP figures.                                                                                                                                 |
 
@@ -425,13 +534,11 @@ exited non-zero. The CLI deliberately redacts low-level network errors; this
 does not establish their precise cause. These failed sandbox attempts remain
 recorded alongside the successful maintainer capture above.
 
-The maintainer has supplied the capture summary and exact downstream Jira ACs.
-**QUESTION: The full capture gist is inaccessible here (page DNS failure,
-GitHub gist API HTTP 403). Please attach/paste the existing JSON on this PR,
-or at least the answer IDs/text/tallies, matched user answers and wallet-probe
-values, so these can be transcribed with provenance. No RPC rerun is needed.**
-Do not paste credentials or private account data. Brave's caveat approval is
-still pending; the maintainer explicitly confirms the draft is not approved.
+The maintainer supplied the detailed inline capture after gist access failed,
+and supplied exact downstream Jira ACs. The evidence-access QUESTION is
+resolved; no RPC rerun is needed. Brave approved all four caveats unchanged,
+with approval provenance above. Successful reads remain maintainer-run, not
+sandbox-run; only log counts, not raw log payloads, were supplied inline.
 
 ## Cost, privacy and follow-up boundary
 
@@ -474,7 +581,16 @@ tests are unchanged. Documentation formatting and docs-only review passed.
 [CI run 38418190440](https://github.com/GoHigherDev/ScoutReport/actions/runs/38418190440)
 still required GitHub approval with no jobs when checked.
 
-Resolved on the maintainer's evidence: successful Mainnet capture and actual
-downstream Jira scopes. Outstanding: access to the existing detailed JSON for
-answer/tally/code-hash transcription and Brave's approval of caveat copy.
-No sandbox live read, detailed value or copy approval is invented.
+After the detailed inline capture and copy approval, the five offline spike
+tests and all **18 workspace lint/typecheck/test/build tasks passed again**.
+Both changed docs passed formatting checks; the transcription review found
+no significant issues and the changed-file secret scan was clean. Scripts,
+ABIs and offline tests remain unchanged. [CI run 38420069190](https://github.com/GoHigherDev/ScoutReport/actions/runs/38420069190)
+required GitHub approval with no jobs when checked.
+
+Resolved on the maintainer's evidence: successful Mainnet capture, detailed
+non-log read transcription, actual downstream Jira scopes and Brave's approval
+of the four caveats (AC7). Raw logs remain captured, not transcribed (counts
+only); token/team mapping, reliable wallet-brand detection, RP feeds and indie
+Partner API access remain UNKNOWN. SR-54/SR-55 remain parked and remote CI
+approval is still required. No sandbox live read or inferred value is claimed.
