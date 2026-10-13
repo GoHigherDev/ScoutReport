@@ -7,7 +7,7 @@ export {
   getDataChain,
   isSupportedChainId,
 } from './networks.ts'
-export { getPublicClient } from './clients.ts'
+export { getPublicClient, getStakingLogClient } from './clients.ts'
 export {
   DEPLOYMENT_ADDRESSES,
   readDeploymentAddresses,

@@ -9,6 +9,8 @@ import {
   OPTIMISER_SOURCE_LINKS,
 } from '../copy/names'
 import { useOptimiserPortfolio, useWalletKind } from './hooks'
+import type { PortfolioRow } from './hooks'
+import { RpEstimatePanel } from './rp-estimate'
 
 const releaseDate = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Europe/London',
@@ -87,7 +89,80 @@ export function OptimiserEarnRoutes() {
   )
 }
 
-export function OptimiserPortfolio() {
+export function stakingCoverage(rows: readonly PortfolioRow[]) {
+  if (rows.some((row) => row.status === 'failure')) return undefined
+  const holdings = rows.filter(
+    (row) =>
+      row.status === 'success' &&
+      row.held + row.staked >= 10n ** BigInt(row.decimals),
+  )
+  return {
+    m: holdings.length,
+    n: holdings.filter(
+      (row) =>
+        row.status === 'success' && row.staked >= 10n ** BigInt(row.decimals),
+    ).length,
+  }
+}
+
+export function OptimiserDashboard({
+  rows,
+}: {
+  rows: readonly PortfolioRow[]
+}) {
+  const copy = NAMES.optimiserCopy.dashboard
+  const coverage = stakingCoverage(rows)
+  const liquidOnly = rows.filter(
+    (row) =>
+      row.status === 'success' &&
+      row.held >= 10n ** BigInt(row.decimals) &&
+      row.staked === 0n,
+  )
+  const nextMidnight = new Date(
+    (Math.floor(Date.now() / 86400_000) + 1) * 86400_000,
+  )
+  const ukTime = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(nextMidnight)
+  return (
+    <section aria-labelledby="staking-coverage-title" className="space-y-3">
+      <h2 id="staking-coverage-title" className="text-xl font-semibold">
+        {copy.heading}
+      </h2>
+      <p>
+        {coverage
+          ? copy.coverage
+              .replace('{n}', String(coverage.n))
+              .replace('{m}', String(coverage.m))
+          : copy.incomplete}
+      </p>
+      {coverage && coverage.m > 0 && coverage.n === coverage.m && (
+        <p>{copy.allStaked}</p>
+      )}
+      <h3 className="font-semibold">{copy.actions}</h3>
+      <p>{copy.noPolls}</p>
+      <ol className="space-y-2">
+        {liquidOnly.map((row) => (
+          <li key={row.key}>{copy.unstaked.replace('{token}', row.symbol)}</li>
+        ))}
+        <li>{copy.watchPrompt}</li>
+      </ol>
+      <a href="#fan-token-checklist" className="underline">
+        {copy.checklist}
+      </a>
+      <p className="text-sm">{copy.creditTime.replace('{time}', ukTime)}</p>
+    </section>
+  )
+}
+
+export function OptimiserPortfolio({
+  rpEstimateEnabled = false,
+}: {
+  rpEstimateEnabled?: boolean
+}) {
   const { address, isConnected } = useConnection()
   const portfolio = useOptimiserPortfolio(isConnected ? address : undefined)
   const [now, setNow] = useState(Date.now)
@@ -121,7 +196,16 @@ export function OptimiserPortfolio() {
   return (
     <section aria-label={NAMES.optimiser} className="space-y-4">
       <Badge>{copy.dataNetwork}</Badge>
-      <OptimiserCaveats />
+      {!(isConnected && address && rpEstimateEnabled) && <OptimiserCaveats />}
+      {isConnected && !portfolio.isPending && !portfolio.isError && (
+        <OptimiserDashboard rows={portfolio.data ?? []} />
+      )}
+      {isConnected && address && rpEstimateEnabled && (
+        <RpEstimatePanel
+          rows={isConnected ? (portfolio.data ?? []) : []}
+          unavailable={portfolio.isPending || portfolio.isError}
+        />
+      )}
       {!isConnected ? (
         <p role="status">{copy.connect}</p>
       ) : portfolio.isPending ? (
@@ -143,7 +227,7 @@ export function OptimiserPortfolio() {
           <p className="text-sm text-sr-muted">
             {copy.captureBlock}: {portfolio.data?.[0].blockNumber.toString()}
           </p>
-          <div className="overflow-x-auto">
+          <div id="fan-token-checklist" className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">{NAMES.optimiser}</caption>
               <thead>
@@ -159,7 +243,7 @@ export function OptimiserPortfolio() {
                 {portfolio.data?.map((token) => {
                   const flagged =
                     token.status === 'success' &&
-                    token.held > 0n &&
+                    token.held >= 10n ** BigInt(token.decimals) &&
                     token.staked === 0n
                   const cells =
                     token.status === 'failure'

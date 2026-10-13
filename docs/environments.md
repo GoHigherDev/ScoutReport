@@ -56,6 +56,7 @@ DB credentials and session secrets for preview/staging.
 | `DATABASE_URL`                                                      | Local root `.env` and web env; Vercel server env; GitHub `preview`/`staging` environment secret | Matching Postgres database, provider-required TLS; migration role needs `citext` creation permission |
 | `SESSION_SECRET`                                                    | Local/Vercel server env per environment                                                         | Maintainer-generated secret for session consumers                                                    |
 | `ADMIN_ADDRESSES`                                                   | Local/Vercel server env                                                                         | Verified allowlist; does not authenticate users                                                      |
+| `FEATURE_RP_ESTIMATE`                                               | Local/Vercel **server-only**, every environment defaults to `false`                              | SR-56 current-owner estimate panel; only `true` enables it, and no figures/read work without approved calibration |
 | `RPC_URL_MAINNET`, `RPC_URL_MAINNET_FALLBACK`, `RPC_WS_URL_MAINNET` | Local/Vercel server env                                                                         | Optional Mainnet read providers; blank uses public defaults                                          |
 | `RPC_URL_SPICY`, `RPC_WS_URL_SPICY`                                 | Local/Vercel server env                                                                         | Optional Spicy providers; blank uses public defaults                                                 |
 | `SUBGRAPH_URL_HOLDINGS`                                             | Local/Vercel **server-only** env, Preview and staging override                                  | Provider-issued Goldsky query URL; never `NEXT_PUBLIC_`, never commit the real URL/project ID        |
@@ -76,5 +77,12 @@ with every still-active preview. Do not drop columns used by older PR builds.
 Auth/write routes remain disabled/fail closed until a deployment-specific shared
 limiter and trusted identity resolver exist. No new public paid-work endpoint is
 introduced. Protection is not a substitute for SR-63 hardening.
+
+SR-56 adds no endpoint or database migration. Do not configure this flag as
+`NEXT_PUBLIC_`; the server passes only its boolean decision to the optimiser.
+Changing the flag does not supply calibration. The shipped calibration list is
+empty; leave the flag off unless the informational panel is deliberately enabled.
+Preview, staging and production do not opt in implicitly. The local Socios Wallet
+declaration is not an authenticated session and never leaves the browser.
 
 See the [deployment runbook](runbooks/deploy.md) for rollout and rollback.

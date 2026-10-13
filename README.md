@@ -79,18 +79,92 @@ RP earning. All route copy and the typed route constant live in
 and no RP amounts, cost-per-point comparisons, rankings or reward promises.
 
 The existing client-side `useWalletKind()` Mainnet account-code read supplies
-context only: EOA shows the external-wallet note; code presence shows the
+context only: EOA shows an account-type note; code presence shows the
 conditional smart-account note. Loading or failed reads show no wallet-type
 note. Neither code (including EIP-7702 delegation) nor connector choice verifies
 Socios Wallet identity or RP eligibility. Results stay fresh indefinitely while
 cached and are retained for 30 minutes after the last observer unmounts, keyed by
 DATA_CHAIN and address. Remounts, focus and reconnects do not trigger automatic
 code reads; a new address triggers one read. Brave approved the banner sentence
-and both notes on 13 October 2026 at 18:38 UK; link labels still require approval.
+and both notes on 13 October 2026 at 18:38 UK; SR-56's later clarification
+supersedes the EOA note's external-wallet inference. Link labels still require approval.
 
-This is not financial advice or a promise of RP/voting eligibility. No RP
-estimates, yields, wallet-brand detection, signing/staking actions, polling or
-new API endpoints are included. Tests use mocked reads, never live RPC.
+SR-56 adds staking coverage and the read-only current-holdings RP Estimate panel.
+`FEATURE_RP_ESTIMATE` is a **server-only** flag, defaulting to `false` everywhere;
+only the exact value `true` enables the panel. `/optimiser` reads it at request
+time; Turbo includes it in its environment/cache key. No estimates or extra
+snapshot reads run when it is off. With the flag on, users can declare that the
+connected address is their Socios Wallet. This is not identity verification.
+The declaration defaults off, is saved per address in this browser's
+`localStorage`, and is never sent to a server, RPC provider or analytics service.
+Switching hides all figures immediately; disconnecting hides the entire panel,
+but keeps the persistent caveats. There is no address input,
+public-profile panel, sign-in, session, signature or database write.
+
+**No measured calibration has been supplied.** `RP_CALIBRATIONS` in
+`apps/web/src/wallet/rp-model.ts` deliberately ships empty: enabling the panel
+does not manufacture RP figures. A follow-up must provide provenance-reviewed
+per-token theta, residuals, distinct-wallet/report-day counts, holdout error,
+calibration dates/block and an approved pool-drift tolerance. An optional supplied
+`driftAlert` represents an explicitly open calibration drift alert; it is not an
+automatically invented alert policy. Required gates are
+at least five distinct wallets, seven report days within a fourteen-day window,
+and holdout error at most 25%. These are quality thresholds, not RP values.
+Report collection/fitting is **not** part of SR-56. Synthetic calibrations exist
+only in tests; no default pool parameter, report API or private Socios source
+exists.
+
+For future supplied calibration, the tested client read path reuses the existing
+public Mainnet log client (PublicNode, no transport retries/fallback) and finds the last block
+**strictly before** midnight UTC and pins wallet `totalStake`, `getTotalStake` and
+on-chain decimals to that block. Pending unstake never increases stake.
+The daily estimate is S/T × theta, not official Socios data; the per-token figure
+divides it by current held + staked tokens, never by projected purchases or future
+staking. A whole active token is required both currently and at the snapshot.
+External-wallet model inputs and CHZ are explicitly ineligible and only return
+zero with the caveat, never a modelled earning rate. EOA/contract code remains
+context, not brand proof; an undeclared address has no figures.
+
+Snapshot failures and upgrades after calibration hide figures; an upgrade
+requires verified replacement calibration before estimates resume. Browser caches
+bound midnight/midpoint, token/day/block-hash pool and wallet snapshots; reorg
+checks prevent reuse of a changed snapshot. There are no new DB/RPC endpoints,
+automatic polling or retries. A presentation-only timer widens stale ranges and
+hides yesterday's snapshot at midnight; refreshing it requires a user action
+(or a new portfolio capture). Snapshots fail closed unless their boundary is the
+current day's midnight UTC: yesterday's snapshot is unavailable, not merely a
+wider estimate. Freshness uses calibration time and the actual snapshot read/
+verification time (`readAt`), not the midnight boundary as a read timestamp.
+Calibration or reads aged at least 24 hours, an explicitly open drift alert, or
+pool drift beyond the approved tolerance use P5/P95 instead of P10/P90 and show
+“recalibrating”. Holdout residuals are **log residuals**, ln(actual / predicted),
+not additive RP errors. With central = S/T × theta, each band endpoint is
+central × exp(q × sqrt(1 + 1 / distinct reporters)), where q is its holdout log
+residual quantile. The small-sample factor widens the band in log space; interval
+bounds also include the central estimate. Overflow or non-finite results are
+unavailable. Figures use two significant figures and every
+RP field is tagged `kind: 'estimate'`. A total is withheld if any current holding
+lacks a valid calibrated estimate; summed interval bounds are conservative,
+not an independence claim.
+
+Coverage counts ownership only when liquid held + active staked totals at least
+one whole on-chain token, excluding dust and pending-only rows, and counts a token
+as staked only at one whole on-chain token or more.
+Failed reads make aggregate coverage unavailable rather than confirming a zero.
+The checklist links to the existing table. SR-54/SR-55 are absent, so the honest
+fallback shows “No polls watched” outside the ordered action list. The list shows
+whole-token liquid-only holdings followed by an unavailable watchlist prompt:
+neutral holdings reminders only, no buy/stake CTA, fabricated poll, vote status or
+nonexistent route. Once those
+stories supply watched/voted polls, their open, unvoted, soonest-closing actions
+can precede the existing holding reminders. The daily midnight UTC information
+uses `Europe/London` for the next credit boundary, including DST.
+
+This is not financial advice or a promise of RP/voting eligibility. All four
+caveats and the approved estimate disclaimer remain visible in the panel.
+SR-61's unconfirmed routes still have no figures or ordering. There are no prices,
+costs, financial rankings, acquisition/staking write actions or RP guarantees.
+Tests use mocked reads, never live RPC.
 
 ## Backend and local database
 
