@@ -291,6 +291,7 @@ export async function readPendingUnstakesBatch(
         string,
         { amount: bigint; releaseAt: bigint }[]
       >()
+      const incomplete = new Set<string>()
       for (const log of logs) {
         if (log.removed) throw new Error('Removed staking event.')
         const decoded = decodeEventLog({
@@ -308,8 +309,11 @@ export async function readPendingUnstakesBatch(
         const key = args.token.toLowerCase()
         const queue = operations.get(key) ?? []
         if (decoded.eventName === 'Unstake') {
-          if (!args.claimableAt || args.claimableAt > 8640000000000n)
-            throw new Error('Invalid release time.')
+          if (!args.claimableAt || args.claimableAt > 8640000000000n) {
+            incomplete.add(key)
+            continue
+          }
+          if (args.amount === 0n) continue
           queue.push({ amount: args.amount, releaseAt: args.claimableAt })
           queue.sort((a, b) =>
             a.releaseAt < b.releaseAt ? -1 : a.releaseAt > b.releaseAt ? 1 : 0,
@@ -323,7 +327,7 @@ export async function readPendingUnstakesBatch(
             queue[0].amount -= consumed
             if (queue[0].amount === 0n) queue.shift()
           }
-          if (remaining > 0n) throw new Error('Incomplete claim history.')
+          if (remaining > 0n) incomplete.add(key)
         }
         operations.set(key, queue)
       }
@@ -331,6 +335,7 @@ export async function readPendingUnstakesBatch(
         const queue = operations.get(token.toLowerCase()) ?? []
         if (
           pendingAmount > 0n &&
+          !incomplete.has(token.toLowerCase()) &&
           queue.length > 0 &&
           queue.reduce((sum, operation) => sum + operation.amount, 0n) ===
             pendingAmount

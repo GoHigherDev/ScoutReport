@@ -714,6 +714,56 @@ describe('pending unstake event reads (offline)', () => {
     })
   })
 
+  it('isolates incomplete claim history to its token and omits zero-pending tokens from log filters (synthetic)', async () => {
+    const h = await pendingSetup()
+    const otherToken = h.getTokenAddress(h.FAN_TOKENS[0], 88888)!
+    const zeroToken = h.getTokenAddress(h.FAN_TOKENS[2], 88888)!
+    mockLogs([
+      log(h.token, h.user, 'Claim', amount, snapshot - 3n),
+      log(h.token, h.user, 'Unstake', amount, snapshot - 2n),
+      log(otherToken, h.user, 'Unstake', 100n, snapshot - 1n),
+      log(
+        otherToken,
+        h.user,
+        'Unstake',
+        200n,
+        snapshot,
+        BigInt(sample.claimableAt) + 100n,
+      ),
+      log(otherToken, h.user, 'Claim', 100n, snapshot, 0n, 1n),
+    ])
+    const result = await h.readPendingUnstakesBatch(
+      h.client,
+      h.user,
+      [
+        { token: h.token, pendingAmount: amount },
+        { token: otherToken, pendingAmount: 200n },
+        { token: zeroToken, pendingAmount: 0n },
+      ],
+      snapshot,
+    )
+    expect(result[0].releaseAt).toBeNull()
+    expect(result[1]).toMatchObject({
+      releaseAt: BigInt(sample.claimableAt) + 100n,
+      pendingOperationCount: 1,
+    })
+    expect(result[2].releaseAt).toBeNull()
+    const filter = request.mock.calls.find(
+      ([rpc]) => rpc.method === 'eth_getLogs',
+    )![0].params[0]
+    expect(filter.topics[2]).toEqual(
+      [h.token, otherToken].map(
+        (token) =>
+          encodeEventTopics({
+            abi,
+            eventName: 'Unstake',
+            args: { token },
+          })[2],
+      ),
+    )
+    expect(h.calls.filter((call) => call === 'unstakePeriod')).toHaveLength(1)
+  })
+
   it('keeps an event-derived release when the contract-wide default read fails', async () => {
     const h = await pendingSetup()
     mockLogs([log(h.token, h.user, 'Unstake', amount, snapshot)])
