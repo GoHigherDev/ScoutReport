@@ -1,0 +1,11 @@
+{
+  "chainId": 88882,
+  "status": "PENDING",
+  "reason": "SR-30: awaiting F-11 and a key holder; no transactions broadcast",
+  "contracts": {
+    "MockSociosStaking": null,
+    "MockFanToken18": null,
+    "MockFanToken6": null
+  },
+  "deploymentTransactionHashes": null
+}
