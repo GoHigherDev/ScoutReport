@@ -16,10 +16,79 @@ pnpm install
 pnpm dev
 ```
 
-The web app runs at <http://localhost:3000>. Copy `.env.example` to `.env.local`
+The web app runs at <http://localhost:3000>. Copy `.env.example` to `apps/web/.env.local`
 and fill in only values for services you have configured. Set
 `NEXT_PUBLIC_SITE_URL` to the public site origin for production Open Graph links;
 it defaults to `http://localhost:3000` when left empty. Do not commit secrets.
+
+## Backend and local database
+
+The API uses Next.js Node.js route handlers and Drizzle with standard Postgres
+`DATABASE_URL` connections. The schema lives in `apps/web/src/server/db/schema.ts`;
+committed Drizzle migrations live in `drizzle/`. No SIWE sign-in or feature
+tables are implemented in this scaffold.
+
+For local database work, install Docker Compose and run from the repository root:
+
+```sh
+cp .env.example .env
+docker compose up -d --wait
+# Local-only connection matching Compose's dev default password:
+export DATABASE_URL="postgresql://scoutreport:${POSTGRES_PASSWORD:-local-only-dev}@localhost:5432/scoutreport"
+pnpm db:migrate
+pnpm dev
+```
+
+Alternatively put `DATABASE_URL` in the ignored root `.env` for migration
+commands and in `apps/web/.env.local` for Next.js. Exported environment variables
+take precedence over these files. The Compose password is a local-only dev default,
+read from `POSTGRES_PASSWORD`; never use it in production. Postgres listens only
+on loopback. `docker compose down` preserves the local volume; `docker compose
+down -v` deletes local data. Changing the password does not change an existing
+volume's database password.
+
+After schema changes run `pnpm db:generate --name <description>`, review the SQL,
+then run `pnpm db:migrate`. The first migration enables `citext`; the migration
+database role needs permission to create that extension. Production uses a
+server-only `DATABASE_URL` (including provider-required TLS settings). Connections
+are lazy, bounded and use no prepared statements for transaction-pooler
+compatibility. The database module must never be imported by client components.
+
+`GET /api/health` probes the database and the DATA_CHAIN and APP_CHAIN clients
+from `packages/chain` concurrently, bypassing the block-number cache. It returns
+`{ db: "ok", dataChainRpc: "ok", appChainRpc: "ok" }` when healthy; failed or
+timed-out probes return `"error"` and HTTP 503. Responses are not cached and
+never expose provider errors. Unit tests mock all dependencies; CI needs no
+database or live RPC.
+
+### Route conventions
+
+Use `handler` from `apps/web/src/server/http.ts` for new API handlers. Pass a Zod
+body `schema` for routes accepting JSON. Validation failures return HTTP 400;
+`HttpError` returns a typed `{ code, message }` object, and unexpected errors
+are redacted to HTTP 500. No request bodies, addresses or IPs are logged.
+
+POST, PUT, PATCH and DELETE routes are automatically rate-limited; mark auth
+routes with `auth: true`, including any future GET auth route. The dev limiter
+allows 20 requests per minute with a shared dev key (no IP collection), expires
+idle keys and caps its map at 10,000 keys. Production auth/write handlers fail
+closed unless supplied with both a shared `RateLimiter` implementation and a
+`rateLimitKey` resolver. SR-16 must wire a deployment-specific shared store and
+trusted identity source before enabling those routes. Do not trust arbitrary
+forwarded-IP headers; if a trusted deployment supplies IP-based keys, retain
+them only for the limiter window and never log or persist them elsewhere.
+
+`requireAdmin(session)` accepts only a minimal `{ address }` session and compares
+it case-insensitively against trimmed, comma-separated `ADMIN_ADDRESSES`. The
+caller must pass a verified session from F-09, not user-supplied JSON; this guard
+does not authenticate anyone. Missing sessions return 401, denied access 403.
+Use `toStoredAddress` for lowercase DB values and `toChecksumAddress` for API/UI
+edges. Postgres also rejects malformed/non-lowercase profile and audit addresses,
+and `citext` makes usernames unique case-insensitively. Writers must refresh
+`profiles.updated_at` on updates.
+
+See [the data inventory](docs/data-inventory.md) for every stored field, current
+retention behaviour and the F-12 privacy hand-off.
 
 ## Contributing
 
@@ -167,6 +236,6 @@ unchanged and does not silently fall back to mocks.
 | `packages/contracts` | Foundry Solidity project                              |
 | `packages/subgraph`  | The Graph subgraph skeleton                           |
 
-Off-chain data will use Postgres with Drizzle ORM, and API endpoints will be
-Next.js route handlers. Subgraph network and contract values are placeholders
+Off-chain data uses Postgres with Drizzle ORM, and API endpoints use Next.js
+route handlers. Subgraph network and contract values are placeholders
 until verified deployments exist.

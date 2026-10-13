@@ -3,6 +3,8 @@ node_modules/
 .turbo/
 .next/
 apps/web/next-env.d.ts
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
 dist/
 build/
 coverage/
