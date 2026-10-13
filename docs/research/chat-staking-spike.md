@@ -12,9 +12,14 @@ not treated as successful or extended indefinitely.
 
 **GO for local mock-interface development; NO-GO for verified live chat gating.**
 The verified ABI is already present from F-06 / SR-11. Mocks and a Spicy-only
-deployment script are ready, but **no deployment was broadcast**. F-11 does not
-exist yet and this environment has no deployer key. Independent Mainnet reads,
-Spicy code confirmation and explorer comparisons are blocked by DNS.
+deployment script are ready, but **no deployment was broadcast**. Per the
+[maintainer's 13 October update](https://github.com/GoHigherDev/ScoutReport/pull/20#issuecomment-6141508687),
+Brave reworded AC4 in Jira: the mocks, tests, Spicy-only deploy script and null
+deployment placeholders satisfy SR-30; actual deployment moves to **F-11** and
+is not a blocker for this spike. Maintainer-run code reads are recorded below.
+**AC5 and AC6 remain pending the maintainer's separate live Mainnet read
+comment**; their sections are not finalised. Sandbox RPC/explorer access still
+fails DNS.
 
 ## Evidence and provenance
 
@@ -23,7 +28,8 @@ Spicy code confirmation and explorer comparisons are blocked by DNS.
 | Complete Staking3 ABI   | [`packages/chain/abis/staking.json`](../../packages/chain/abis/staking.json), supplied in [SR-11 / issue #17](https://github.com/GoHigherDev/ScoutReport/issues/17), retrieved 13 October 2026                                                                                            | Reused unchanged; no independently observed ABI difference.                                                                                                                                                                    |
 | Verified implementation | [Routescan source API](https://api.routescan.io/v2/network/mainnet/evm/88888/etherscan/api?module=contract&action=getsourcecode&address=0xed9331b504cd498ec04613d621a92c8e28bb8417), [Chiliscan implementation](https://chiliscan.com/address/0xed9331b504cd498ec04613d621a92c8e28bb8417) | F-06 records Staking3, Solidity 0.8.23, UUPS implementation `0xed9331b504cd498ec04613d621a92c8e28bb8417`. Independent source re-fetch failed DNS on 13 October. Recheck the implementation before relying on a future capture. |
 | Mainnet proxy           | [Chiliscan proxy](https://chiliscan.com/address/0x5ff7f9724fd477d9a07dcdb894d0ca7f8fae1501), [SR-30 pipeline notes](https://github.com/GoHigherDev/ScoutReport/issues/19)                                                                                                                 | `0x5ff7f9724fd477d9a07dcdb894d0ca7f8fae1501`; supplied verified address, not a testnet deployment.                                                                                                                             |
-| Spicy `eth_getCode`     | SR-30 pipeline notes, 13 October 2026 09:10 UK (08:10 UTC)                                                                                                                                                                                                                                | Supplied observation: `0x` at the Mainnet proxy address on Spicy. **Not independently reproduced here.**                                                                                                                       |
+| Spicy `eth_getCode` | [Maintainer-run read](https://github.com/GoHigherDev/ScoutReport/pull/20#issuecomment-6141508687), 13 October 2026, `https://spicy-rpc.chiliz.com` | Returned `0x` for `0x5ff7f9724fd477d9a07dcdb894d0ca7f8fae1501`: no staking contract at that address on Spicy. Not reproduced in the sandbox; block number UNKNOWN. |
+| Mainnet `eth_getCode` | [Maintainer-run read](https://github.com/GoHigherDev/ScoutReport/pull/20#issuecomment-6141508687), 13 October 2026, `https://rpc.chiliz.com` | The same address returns an ERC-1967 proxy according to the maintainer. Raw bytecode and block number were not supplied; not reproduced in the sandbox. |
 | `unstakePeriod()`       | SR-30 pipeline notes and [F-06](https://github.com/GoHigherDev/ScoutReport/pull/18), 13 October 2026                                                                                                                                                                                      | Supplied live observation: **604800 seconds (7 days)**. Independent call failed DNS; block number UNKNOWN. It is contract-wide, not proof of any token override.                                                               |
 | Token catalogue         | [Chiliz token contract addresses](https://docs.chiliz.com/quick-start/token-contract-addresses), [`FAN_TOKENS`](../../packages/chain/src/tokens.config.ts)                                                                                                                                | NAVI and AFC Mainnet V2 proxies are configured; no Spicy address is configured. Pipeline notes report on-chain decimals of 18 for both; independent reads remain blocked.                                                      |
 
@@ -37,7 +43,7 @@ The staking results reference a `stakingABI.json` attachment and testnet/mainnet
 staking links, but page bodies, the exact attachment URL and linked deployment
 tables could not be independently retrieved. Alternative official Spicy staking
 deployments remain **UNKNOWN**, not evidence that none exists anywhere.
-The supplied Spicy empty-code observation supports the **mock + Mainnet
+The maintainer-run Spicy empty-code observation supports the **mock + Mainnet
 read-only verification** strategy. Whether Spicy has other official Fan Token
 contracts is **UNKNOWN**; absence from `FAN_TOKENS` is not a chain-wide search.
 
@@ -199,6 +205,8 @@ verification. Confirm the ERC-1967 implementation against F-06 provenance.
 
 [`deployments/88882.json`](../../deployments/88882.json) is deliberately
 **PENDING**, with null addresses and transaction hashes, not usable config.
+This satisfies revised **AC4 for SR-30**; populating real addresses and deploying
+the mocks are **F-11 deliverables**, not outstanding SR-30 acceptance work.
 The following command is a **key-holder hand-off only**, to be integrated with
 F-11, not executed by this spike. The authorised runner supplies
 `SPICY_DEPLOYER_PRIVATE_KEY` through its secret environment; do not put it in a
@@ -217,10 +225,8 @@ on-chain decimals, exercise both read signatures on Spicy, and record real
 addresses, transaction hashes and verification date in the manifest. Keep
 Foundry broadcast artefacts ignored.
 
-**QUESTION:** Spicy deployment is waiting for F-11 and an authorised key holder.
-Can the maintainer arrange that deployment and return only public addresses and
-transaction hashes, and arrange the read-only RPC verification above from a
-network-enabled runner? Do not provide a key to this agent.
+Deployment is deferred to F-11; this spike does not wait for it or request a key.
+The maintainer will supply the separate live Mainnet evidence for AC5/AC6.
 
 ## Proposed env/config shape (not implemented tier logic)
 
@@ -248,7 +254,7 @@ a **staking-dependency gate**, not a claim to know every ticket's requirements.
 
 | Story | Local staking dependency   | Live staking dependency / remaining gate                                                                |
 | ----- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
-| C-02  | Mock GO                    | NO-GO: two-token Mainnet capture and Spicy deployment pending; confirm story scope.                     |
+| C-02  | Mock GO                    | NO-GO: two-token Mainnet capture pending; confirm story scope. Spicy deployment is a separate F-11 dependency, not an SR-30 AC. |
 | C-03  | Mock GO for test scenarios | NO-GO: verified totals/cooldown semantics and owner decision on pending amounts; no tier policy chosen. |
 | C-04  | Mock GO                    | NO-GO for live staking-dependent behaviour; confirm scope and complete evidence/deployment.             |
 | C-05  | Mock GO                    | NO-GO for live staking-dependent behaviour; confirm scope and complete evidence/deployment.             |
@@ -265,7 +271,8 @@ block-pinned captures remain open; helpers currently discard all tuple fields
 except `totalStake`.
 
 **F-11:** deploy and verify mocks using the authorised secret-bearing workflow;
-return public evidence only. Deployment acceptance is **not complete**.
+return public evidence only. Actual deployment is deferred to F-11 under
+revised AC4; **SR-30's mock scaffold acceptance is met**.
 
 **R-01:** this is a balance interface, not an RP/yield oracle. External-wallet
 staking does not earn Socios RP according to F-06. No Partner credentials,
@@ -274,8 +281,10 @@ from mock balances, lock arrays or the seven-day supplied period.
 
 Remaining UNKNOWNs: official Spicy deployments/token availability, source
 accounting and flag semantics, two real staker captures, explorer comparisons,
-token overrides and independent period/code reads. These block completion of
-the live-evidence acceptance criteria, not local mock tests.
+token overrides and sandbox period reads. The proxy code checks have
+maintainer-run evidence; other official Spicy deployment/token availability
+remains UNKNOWN. AC5/AC6 await the promised maintainer comment. Actual mock
+deployment does not block revised SR-30 acceptance.
 
 ## Validation
 
@@ -286,5 +295,7 @@ the live-evidence acceptance criteria, not local mock tests.
 - Separate read-only code review: no significant issues found. The automated
   review binary was unavailable; CodeQL did not analyse Solidity.
 - Initial CI required maintainer approval and had no jobs/logs.
-  [CI run 38368590306](https://github.com/GoHigherDev/ScoutReport/actions/runs/38368590306)
-  subsequently **passed** for code commit `17e8dec` after approval.
+  [CI run 38368820202](https://github.com/GoHigherDev/ScoutReport/actions/runs/38368820202)
+  subsequently **passed all four checks** on reviewed head `2be616f` after approval.
+  This is the latest verified green run before this documentation-only update,
+  not a claim that a later head has already passed CI.

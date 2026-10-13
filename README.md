@@ -146,8 +146,9 @@ synthetic arithmetic cases; they do not claim a block-pinned Mainnet capture.
 
 See the [SR-30 staking spike](docs/research/chat-staking-spike.md) for the exact
 tuple interface, evidence limitations, Spicy mock strategy, read-only
-verification commands and C-02–C-11 / R-01 hand-offs. Mock deployment is pending
-F-11 and an authorised key holder; `deployments/88882.json` contains null
+verification commands and C-02–C-11 / R-01 hand-offs. Revised SR-30 AC4 is met
+by the mock scaffold; actual deployment is deferred to F-11 and an authorised
+key holder. `deployments/88882.json` contains null
 placeholders, not deployed addresses. The existing Mainnet reader remains
 unchanged and does not silently fall back to mocks.
 
