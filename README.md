@@ -70,9 +70,12 @@ with Multicall3 batching on both networks. `ensureChain(walletClient, chainId)`
 checks the wallet's current chain, switches it, and adds unknown networks before
 retrying. User rejection raises `ChainSwitchRejectedError` with a readable message.
 
-`FAN_TOKENS` contains the explorer-verified Mainnet V2 NAVI and AFC addresses,
-with source URLs beside each entry. There are no official V2 deployments on
-Spicy: `getTokenAddress(token, 88882)` returns `undefined`. Config validation
+`FAN_TOKENS` contains all 81 official Mainnet V2 entries, using
+[maintainer-verified data](https://github.com/GoHigherDev/ScoutReport/issues/21#issuecomment-6141845905)
+and the [approved sports and DOJO decision](https://github.com/GoHigherDev/ScoutReport/pull/22#issuecomment-6142801649).
+Each entry records the official source URL and retrieval date (13 October 2026).
+Legacy 0-decimal AFC is excluded. No Spicy addresses are configured:
+`getTokenAddress(token, 88882)` returns `undefined`. Config validation
 rejects missing Mainnet, empty, zero or malformed addresses; an omitted optional
 Spicy address is valid.
 
@@ -88,8 +91,9 @@ verification assertions only, never a substitute for an on-chain read.
 Run `pnpm --filter chain verify-tokens` to check every available token on
 `DATA_CHAIN` (`NEXT_PUBLIC_DATA_CHAIN_ID`, Mainnet by default). The script uses
 Node 24's TypeScript support and requires RPC access; it exits non-zero on
-invalid addresses, failed reads, symbol or decimals mismatches. Spicy reports
-these tokens as unavailable without making RPC calls. Live verification is
+invalid addresses, failed reads, symbol or decimals mismatches. Only the approved
+Mainnet DOJO contract expects the on-chain symbol `$DOJO` for ticker `DOJO`.
+Spicy reports these tokens as unavailable without making RPC calls. Live verification is
 separate from the deterministic mocked-transport unit tests and CI builds.
 
 ### Read-only Socios staking
