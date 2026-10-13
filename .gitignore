@@ -13,6 +13,10 @@ generated/
 packages/subgraph/tests/.bin/
 packages/subgraph/tests/.latest.json
 packages/subgraph/tests/.docker/
+packages/subgraph/predictions/subgraph.testnet.yaml
+packages/subgraph/predictions/tests/.bin/
+packages/subgraph/predictions/tests/.latest.json
+packages/subgraph/predictions/tests/.docker/
 
 .env*
 !.env.example

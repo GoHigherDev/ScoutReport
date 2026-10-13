@@ -1,0 +1,31 @@
+specVersion: 1.3.0
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum/contract
+    name: ScoutReportPredictions
+    network: chiliz
+    source:
+      abi: ScoutReportPredictions
+      # P-09: mainnet address and startBlock await a confirmed deployment.
+      # This is a non-deployable template; the deployment generator supplies both.
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities: [Match, Prediction, PredictorIndex, UserPoints, WeeklyPoints]
+      abis:
+        - name: ScoutReportPredictions
+          file: ../../chain/abis/ScoutReportPredictions.json
+      eventHandlers:
+        - event: MatchCreated(indexed bytes32,uint64,uint8,uint32)
+          handler: handleMatchCreated
+        - event: Predicted(indexed bytes32,indexed address,uint8)
+          handler: handlePredicted
+        - event: MatchSettled(indexed bytes32,uint8)
+          handler: handleMatchSettled
+        - event: PointsCredited(indexed bytes32,uint32,uint32)
+          handler: handlePointsCredited
+        - event: MatchVoided(indexed bytes32)
+          handler: handleMatchVoided
+      file: ./src/mapping.ts

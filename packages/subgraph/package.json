@@ -4,16 +4,19 @@
   "private": true,
   "scripts": {
     "deploy:chiliz": "node scripts/deploy.mjs chiliz",
-    "build": "graph codegen && graph build",
-    "codegen": "graph codegen",
-    "lint": "eslint src tests scripts",
-    "typecheck": "graph codegen && graph build && graph build subgraph.testnet.yaml --output-dir build/testnet",
-    "test": "node --test scripts/*.test.mjs && graph codegen && graph test --version 0.6.0"
+    "build": "graph codegen && graph build && node scripts/predictions.mjs build",
+    "codegen": "graph codegen && node scripts/predictions.mjs codegen",
+    "lint": "eslint src tests scripts predictions/src predictions/tests",
+    "typecheck": "graph codegen && graph build && graph build subgraph.testnet.yaml --output-dir build/testnet && node scripts/predictions.mjs build && tsc --noEmit --strict --skipLibCheck --target es2022 --module esnext --moduleResolution bundler scripts/check-points.ts",
+    "test": "node --test scripts/*.test.mjs && graph codegen && graph test --version 0.6.0 && node scripts/predictions.mjs test",
+    "predictions:generate": "node scripts/predictions.mjs",
+    "check-points": "node scripts/check-points.ts"
   },
   "devDependencies": {
     "@graphprotocol/graph-cli": "0.98.1",
     "@graphprotocol/graph-ts": "0.38.2",
     "assemblyscript": "0.19.23",
-    "matchstick-as": "0.6.0"
+    "matchstick-as": "0.6.0",
+    "viem": "2.57.3"
   }
 }
