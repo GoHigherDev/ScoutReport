@@ -4,7 +4,7 @@ This is a separate subgraph from holdings/staking. It indexes the five events
 from `ScoutReportPredictions`; it makes no contract calls and needs no sports
 API. ScoutReport is a third-party dapp on Chiliz Chain, not affiliated with
 Socios. Prediction points are the contract's non-transferable counters, not
-Socios Reward Points. This index makes no reward or legal promises.
+Socios Reward Points.
 
 ## Event semantics
 
@@ -153,12 +153,18 @@ cd predictions
 chain 88888). P-09 must supply a confirmed mainnet address and deployment block;
 neither is fabricated here. Its ABI path is
 `../../chain/abis/ScoutReportPredictions.json`. The parent generator supplies
-address/startBlock from verified deployment records, including Spicy (88882),
-and fails closed when deployment evidence is missing. Do not deploy the bare
-template or mix its data with holdings.
+address/startBlock for Spicy (88882) from its verified deployment record and
+generates `subgraph.testnet.yaml`. It skips the Spicy manifest only when
+`contracts.ScoutReportPredictions` is explicitly null; missing or invalid records
+fail. The generated `networks.json` keeps `chiliz: {}` pending P-09. Do not deploy
+the bare template or mix its data with holdings.
 
 The parent CLI `scripts/check-points.ts` uses `RPC_URL_SPICY` and
-`SUBGRAPH_URL_PREDICTIONS` to compare indexed season totals with on-chain
-`pointsOf` for supplied wallets. Configure these environment variables locally;
-never commit credentials. Actual deployment, endpoint publication and live
-reconciliation remain pending until a real deployment and indexer are available.
+`SUBGRAPH_URL_PREDICTIONS` to compare the top 50 users ordered by total with
+on-chain `pointsOf`. It reads the indexed block from `_meta`, then queries both
+the leaderboard and contract at that same block; the RPC must support historical
+state reads. Configure these environment variables locally, then run
+`pnpm check-points` from `packages/subgraph`. The CLI exits nonzero on a mismatch
+or failure. Never run live reconciliation in CI or commit credentials. Actual
+deployment, endpoint publication and live reconciliation remain pending until a
+real deployment and indexer are available.
