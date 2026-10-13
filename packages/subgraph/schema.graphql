@@ -1,3 +1,22 @@
-type ScaffoldPlaceholder @entity(immutable: true) {
-  id: Bytes!
+type Token @entity(immutable: false) {
+  id: ID!
+  symbol: String!
+  decimals: Int!
+}
+
+type Account @entity(immutable: false) {
+  id: ID!
+  holdings: [Holding!]! @derivedFrom(field: "account")
+}
+
+type Holding @entity(immutable: false) {
+  id: ID!
+  token: Token!
+  account: Account!
+  liquid: BigInt!
+  staked: BigInt!
+  scoutRating: BigInt!
+  firstAcquiredAt: BigInt
+  updatedAt: BigInt!
+  isExcluded: Boolean!
 }

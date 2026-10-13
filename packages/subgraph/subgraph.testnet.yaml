@@ -1,0 +1,24 @@
+specVersion: 1.3.0
+schema:
+  file: ./schema.graphql
+# No verified NAVI, AFC or staking deployment exists on Spicy.
+dataSources:
+  - kind: ethereum/contract
+    name: TestnetScaffold
+    network: chiliz-testnet
+    source:
+      abi: ERC20
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities: []
+      abis:
+        - name: ERC20
+          file: ./abis/ERC20.json
+      blockHandlers:
+        - handler: handleTestnetBlock
+          filter:
+            kind: once
+      file: ./src/testnet.ts

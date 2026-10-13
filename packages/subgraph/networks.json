@@ -1,4 +1,17 @@
 {
-  "chiliz": {},
+  "chiliz": {
+    "NAVI": {
+      "address": "0x02728748392F1875682940681F4C936Fc683A68e",
+      "startBlock": 31150409
+    },
+    "AFC": {
+      "address": "0x76088F3eD5dC655De9295D93868ec1EeC654A615",
+      "startBlock": 32619372
+    },
+    "Staking": {
+      "address": "0x5ff7f9724fd477d9a07dcdb894d0ca7f8fae1501",
+      "startBlock": 20901330
+    }
+  },
   "chiliz-testnet": {}
 }
