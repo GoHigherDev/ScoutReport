@@ -27,9 +27,16 @@ Spicy code confirmation and explorer comparisons are blocked by DNS.
 | `unstakePeriod()`       | SR-30 pipeline notes and [F-06](https://github.com/GoHigherDev/ScoutReport/pull/18), 13 October 2026                                                                                                                                                                                      | Supplied live observation: **604800 seconds (7 days)**. Independent call failed DNS; block number UNKNOWN. It is contract-wide, not proof of any token override.                                                               |
 | Token catalogue         | [Chiliz token contract addresses](https://docs.chiliz.com/quick-start/token-contract-addresses), [`FAN_TOKENS`](../../packages/chain/src/tokens.config.ts)                                                                                                                                | NAVI and AFC Mainnet V2 proxies are configured; no Spicy address is configured. Pipeline notes report on-chain decimals of 18 for both; independent reads remain blocked.                                                      |
 
-The official Socios Connect “Working with Staking” / `StakingABI.json` resource
-and any alternative official Spicy staking deployment could not be independently
-retrieved. **UNKNOWN**, not evidence that no deployment exists anywhere.
+Official pages discovered in indexed search results:
+
+- [Socios Connect: Working with Staking](https://connect.socios.com/interact-with-chiliz-chain/working-with-staking)
+- [Socios Connect: Testnet Fan Token addresses](https://connect.socios.com/interact-with-chiliz-chain/working-with-tokens/testnet-fan-token-addresses)
+- [Chiliz: Smart Contract Addresses](https://docs.chiliz.com/quick-start/smart-contract-addresses)
+
+The staking results reference a `stakingABI.json` attachment and testnet/mainnet
+staking links, but page bodies, the exact attachment URL and linked deployment
+tables could not be independently retrieved. Alternative official Spicy staking
+deployments remain **UNKNOWN**, not evidence that none exists anywhere.
 The supplied Spicy empty-code observation supports the **mock + Mainnet
 read-only verification** strategy. Whether Spicy has other official Fan Token
 contracts is **UNKNOWN**; absence from `FAN_TOKENS` is not a chain-wide search.
@@ -75,6 +82,7 @@ unstakePeriod() external view returns (uint256);
 ```
 
 Both stake readers return **one tuple**, not eight separate outputs.
+Its verified ABI internal type is `struct IStaking2aTypes.StakeDataResponse`.
 `staker` is the public wallet being queried; `token` is the Fan Token proxy,
 not its implementation. `perEventType` is a boolean; its exact branch behaviour,
 array indexing and event-type identifiers are **UNKNOWN** without verified
@@ -110,6 +118,8 @@ tuple interface; cooldown versus matured-claimable semantics are not yet
 verified. Whether either counts towards Bronze/Silver/Gold is **C-03's product
 decision**, not made by this spike. The existing helper only exposes
 `totalStake`; its `unstaked` alias means liquid `balanceOf`, not cooldown.
+The tuple has no timestamp/deadline field, so these readers alone do not
+directly give a wallet's remaining cooldown duration.
 
 ## Mainnet verification: two configured tokens
 
@@ -266,3 +276,15 @@ Remaining UNKNOWNs: official Spicy deployments/token availability, source
 accounting and flag semantics, two real staker captures, explorer comparisons,
 token overrides and independent period/code reads. These block completion of
 the live-evidence acceptance criteria, not local mock tests.
+
+## Validation
+
+- `pnpm turbo run lint typecheck test build`: all 15 tasks passed locally.
+- `forge fmt --check` and Foundry tests: passed (11 tests, including 10 new
+  focused mock tests). Local toolchain: Forge 1.7.1, Solidity 0.8.30.
+- Changed-file secret scan: no secrets found. No transactions broadcast.
+- Separate read-only code review: no significant issues found. The automated
+  review binary was unavailable; CodeQL did not analyse Solidity.
+- Initial CI required maintainer approval and had no jobs/logs.
+  [CI run 38368590306](https://github.com/GoHigherDev/ScoutReport/actions/runs/38368590306)
+  subsequently **passed** for code commit `17e8dec` after approval.
