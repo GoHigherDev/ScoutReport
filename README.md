@@ -69,6 +69,15 @@ shows the approved external-wallet RP caveat once; the other three approved
 research caveats remain in the checklist. The banner links to the Socios Connect
 staking guide and Help Centre RP/voting articles.
 
+SR-61 adds a static, wallet-independent RP route list. Fan Token staking through
+the Socios app is source-confirmed and links to the official staking guide with
+a short how-to. Fan Zone tasks, polls, quizzes and check-ins are **Unconfirmed**
+as RP routes: their research links explain the evidence limits, not earning
+instructions. Evidence that a poll exists or can be voted on does not confirm
+RP earning. All route copy and the typed route constant live in
+`apps/web/src/copy/names.ts`. The list adds no API, polling, database or RPC work,
+and no RP amounts, cost-per-point comparisons, rankings or reward promises.
+
 The existing client-side `useWalletKind()` Mainnet account-code read supplies
 context only: EOA shows the external-wallet note; code presence shows the
 conditional smart-account note. Loading or failed reads show no wallet-type

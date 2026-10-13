@@ -74,3 +74,24 @@ and a tester's wallet; do not record credentials or private keys in QA evidence.
   offered.
 - When nested `/optimiser/*` pages are added, confirm they inherit the same
   layout banner without mounting another copy.
+
+## SR-61 RP route flags
+
+- Visit `/optimiser` disconnected, connected and with portfolio RPC reads
+  blocked. The same static route list remains visible in all states.
+- Fan Token staking via the Socios app is Source-confirmed, with a short how-to
+  limited to the Socios app (Socios Wallet) and its eligibility requirements.
+  Its source is the official Socios Connect staking guide.
+- Fan Zone tasks, polls, quizzes and check-ins show **Unconfirmed** and a link
+  to the R-01 research assessment, with no how-to-earn claim. Poll availability
+  must not be mistaken for confirmation of RP earning.
+- Check every route source against `OPTIMISER_EARN_ROUTES` in
+  `apps/web/src/copy/names.ts`: links open in new tabs with
+  `rel="noopener noreferrer"`.
+- Confirm there are no RP amounts, yields, APY, currency amounts, cost-per-point
+  comparisons, cheapest-route rankings or reward promises in the route section.
+  External-wallet staking must not be represented as RP earning.
+- Confirm all four approved caveats remain unchanged and appear exactly once
+  on the page. The route section offers no transaction or signing actions.
+- Inspect network traffic: the route list adds no requests, API endpoints,
+  polling, database queries or RPC calls beyond the existing portfolio/banner.

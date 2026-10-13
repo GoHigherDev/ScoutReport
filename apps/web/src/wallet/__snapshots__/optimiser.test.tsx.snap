@@ -92,6 +92,141 @@ exports[`optimiser RP caveat > keeps the banner on the optimiser page when conne
         Connect your wallet to view your Fan Token checklist.
       </p>
     </section>
+    <section
+      aria-labelledby="optimiser-earn-routes"
+      class="space-y-4"
+    >
+      <h2
+        class="text-xl font-semibold"
+        id="optimiser-earn-routes"
+      >
+        Socios Reward Point routes
+      </h2>
+      <p
+        class="text-sm text-sr-muted"
+      >
+        Source-confirmed routes are not confirmation of your eligibility or points received. Other activities remain unconfirmed as RP routes.
+      </p>
+      <ul
+        class="space-y-4"
+      >
+        <li
+          class="space-y-2 rounded border border-sr-border p-4"
+        >
+          <h3
+            class="font-semibold"
+          >
+            Fan Token staking via the Socios app
+          </h3>
+          <span
+            class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-sr-surface text-sr-text"
+          >
+            Source-confirmed
+          </span>
+          <p
+            class="text-sm"
+          >
+            In the Socios.com app (Socios Wallet), review Fan Token staking and the app’s eligibility requirements.
+          </p>
+          <a
+            class="block text-sm underline"
+            href="https://connect.socios.com/interact-with-chiliz-chain/working-with-staking"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Socios Connect, Working with Staking
+          </a>
+        </li>
+        <li
+          class="space-y-2 rounded border border-sr-border p-4"
+        >
+          <h3
+            class="font-semibold"
+          >
+            Fan Zone tasks
+          </h3>
+          <span
+            class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-sr-surface text-sr-text"
+          >
+            Unconfirmed
+          </span>
+          <a
+            class="block text-sm underline"
+            href="https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            R-01 research, route evidence and limitations
+          </a>
+        </li>
+        <li
+          class="space-y-2 rounded border border-sr-border p-4"
+        >
+          <h3
+            class="font-semibold"
+          >
+            Polls
+          </h3>
+          <span
+            class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-sr-surface text-sr-text"
+          >
+            Unconfirmed
+          </span>
+          <a
+            class="block text-sm underline"
+            href="https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md#rp-and-other-app-side-data"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            R-01 research, route evidence and limitations
+          </a>
+        </li>
+        <li
+          class="space-y-2 rounded border border-sr-border p-4"
+        >
+          <h3
+            class="font-semibold"
+          >
+            Quizzes
+          </h3>
+          <span
+            class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-sr-surface text-sr-text"
+          >
+            Unconfirmed
+          </span>
+          <a
+            class="block text-sm underline"
+            href="https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md#rp-and-other-app-side-data"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            R-01 research, route evidence and limitations
+          </a>
+        </li>
+        <li
+          class="space-y-2 rounded border border-sr-border p-4"
+        >
+          <h3
+            class="font-semibold"
+          >
+            Check-ins
+          </h3>
+          <span
+            class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-sr-surface text-sr-text"
+          >
+            Unconfirmed
+          </span>
+          <a
+            class="block text-sm underline"
+            href="https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md#rp-and-other-app-side-data"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            R-01 research, route evidence and limitations
+          </a>
+        </li>
+      </ul>
+    </section>
   </main>
 </DocumentFragment>
 `;
@@ -187,6 +322,141 @@ exports[`optimiser RP caveat > keeps the banner on the optimiser page when conne
       >
         No Fan Token holdings or stakes found on Mainnet.
       </p>
+    </section>
+    <section
+      aria-labelledby="optimiser-earn-routes"
+      class="space-y-4"
+    >
+      <h2
+        class="text-xl font-semibold"
+        id="optimiser-earn-routes"
+      >
+        Socios Reward Point routes
+      </h2>
+      <p
+        class="text-sm text-sr-muted"
+      >
+        Source-confirmed routes are not confirmation of your eligibility or points received. Other activities remain unconfirmed as RP routes.
+      </p>
+      <ul
+        class="space-y-4"
+      >
+        <li
+          class="space-y-2 rounded border border-sr-border p-4"
+        >
+          <h3
+            class="font-semibold"
+          >
+            Fan Token staking via the Socios app
+          </h3>
+          <span
+            class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-sr-surface text-sr-text"
+          >
+            Source-confirmed
+          </span>
+          <p
+            class="text-sm"
+          >
+            In the Socios.com app (Socios Wallet), review Fan Token staking and the app’s eligibility requirements.
+          </p>
+          <a
+            class="block text-sm underline"
+            href="https://connect.socios.com/interact-with-chiliz-chain/working-with-staking"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Socios Connect, Working with Staking
+          </a>
+        </li>
+        <li
+          class="space-y-2 rounded border border-sr-border p-4"
+        >
+          <h3
+            class="font-semibold"
+          >
+            Fan Zone tasks
+          </h3>
+          <span
+            class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-sr-surface text-sr-text"
+          >
+            Unconfirmed
+          </span>
+          <a
+            class="block text-sm underline"
+            href="https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            R-01 research, route evidence and limitations
+          </a>
+        </li>
+        <li
+          class="space-y-2 rounded border border-sr-border p-4"
+        >
+          <h3
+            class="font-semibold"
+          >
+            Polls
+          </h3>
+          <span
+            class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-sr-surface text-sr-text"
+          >
+            Unconfirmed
+          </span>
+          <a
+            class="block text-sm underline"
+            href="https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md#rp-and-other-app-side-data"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            R-01 research, route evidence and limitations
+          </a>
+        </li>
+        <li
+          class="space-y-2 rounded border border-sr-border p-4"
+        >
+          <h3
+            class="font-semibold"
+          >
+            Quizzes
+          </h3>
+          <span
+            class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-sr-surface text-sr-text"
+          >
+            Unconfirmed
+          </span>
+          <a
+            class="block text-sm underline"
+            href="https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md#rp-and-other-app-side-data"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            R-01 research, route evidence and limitations
+          </a>
+        </li>
+        <li
+          class="space-y-2 rounded border border-sr-border p-4"
+        >
+          <h3
+            class="font-semibold"
+          >
+            Check-ins
+          </h3>
+          <span
+            class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-sr-surface text-sr-text"
+          >
+            Unconfirmed
+          </span>
+          <a
+            class="block text-sm underline"
+            href="https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md#rp-and-other-app-side-data"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            R-01 research, route evidence and limitations
+          </a>
+        </li>
+      </ul>
     </section>
   </main>
 </DocumentFragment>
