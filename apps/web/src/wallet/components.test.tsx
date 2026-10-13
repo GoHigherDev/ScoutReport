@@ -187,7 +187,12 @@ describe('holdings strip', () => {
   it('renders held, staked and held + staked without labelling stake as RP earnings', () => {
     mocks.connection.isConnected = true
     mocks.holdings.data = [
-      { key: 'test', symbol: 'TEST', ...normaliseStake(1234567n, 2000000n, 6) },
+      {
+        key: 'test',
+        symbol: 'TEST',
+        status: 'success',
+        ...normaliseStake(1234567n, 2000000n, 6),
+      },
     ]
     const { rerender } = render(<HoldingsStrip />)
     expect(screen.getByText('1.234567')).toBeInTheDocument()
@@ -198,5 +203,25 @@ describe('holdings strip', () => {
     mocks.connection.isConnected = false
     rerender(<HoldingsStrip />)
     expect(screen.queryByText('TEST')).not.toBeInTheDocument()
+  })
+
+  it('keeps successful holdings visible alongside an unavailable token', () => {
+    mocks.connection.isConnected = true
+    mocks.holdings.data = [
+      {
+        key: 'available',
+        symbol: 'AVAILABLE',
+        status: 'success',
+        ...normaliseStake(1000000n, 0n, 6),
+      },
+      { key: 'failed', symbol: 'FAILED', status: 'failure' },
+    ]
+    render(<HoldingsStrip />)
+    expect(screen.getByText('AVAILABLE')).toBeInTheDocument()
+    expect(screen.getByText('FAILED')).toBeInTheDocument()
+    expect(
+      screen.getByText(NAMES.optimiserCopy.unavailable),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(NAMES.wallet.empty)).not.toBeInTheDocument()
   })
 })

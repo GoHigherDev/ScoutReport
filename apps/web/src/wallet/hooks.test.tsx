@@ -3,20 +3,24 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState, type ReactNode } from 'react'
 import { FAN_TOKENS, getTokenAddress, normaliseStake } from '@scoutreport/chain'
-import { readHoldings, useHoldings, useWalletKind } from './hooks'
+import {
+  readHoldings,
+  useHoldings,
+  useOptimiserPortfolio,
+  useWalletKind,
+} from './hooks'
 
-const { connection, batch, meta, getCode, getPublicClient } = vi.hoisted(
-  () => ({
+const { connection, batch, getBlockNumber, getCode, getPublicClient } =
+  vi.hoisted(() => ({
     connection: {
       address: '0x0000000000000000000000000000000000000001',
       isConnected: true,
     },
     batch: vi.fn(),
-    meta: vi.fn(),
+    getBlockNumber: vi.fn(),
     getCode: vi.fn(),
     getPublicClient: vi.fn(),
-  }),
-)
+  }))
 vi.mock('wagmi', () => ({ useConnection: () => connection }))
 vi.mock('@scoutreport/chain', async (importOriginal) => {
   const original = await importOriginal<typeof import('@scoutreport/chain')>()
@@ -28,7 +32,6 @@ vi.mock('@scoutreport/chain', async (importOriginal) => {
     ],
     getPublicClient,
     readStakeDataLatestBatch: batch,
-    readTokenMeta: meta,
   }
 })
 
@@ -41,20 +44,29 @@ function wrapper({ children }: { children: ReactNode }) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubEnv('NEXT_PUBLIC_APP_CHAIN_ID', '88882')
+  vi.stubEnv('NEXT_PUBLIC_DATA_CHAIN_ID', '88888')
   connection.isConnected = true
   connection.address = '0x0000000000000000000000000000000000000001'
-  getPublicClient.mockReturnValue({ getCode })
-  meta.mockResolvedValue({
-    symbol: 'TEST',
-    name: 'Synthetic test token',
-    decimals: 6,
-  })
+  getPublicClient.mockReturnValue({ getCode, getBlockNumber })
+  getBlockNumber.mockResolvedValue(123n)
   batch.mockImplementation(async (_client, _user, addresses: string[]) =>
-    addresses.map(() => normaliseStake(0n, 0n, 6)),
+    addresses.map(() => successfulStake(0n, 0n)),
   )
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllEnvs()
+})
+
+function successfulStake(held: bigint, staked: bigint) {
+  return {
+    ...normaliseStake(held, staked, 6),
+    status: 'success' as const,
+    meta: { symbol: 'TEST', name: 'Synthetic test token', decimals: 6 },
+  }
+}
 
 describe('holdings reads', () => {
   it('batches every Mainnet token, filters zeros and uses helper formatting', async () => {
@@ -65,10 +77,9 @@ describe('holdings reads', () => {
     })
     batch.mockResolvedValue(
       addresses.map((_, index) =>
-        normaliseStake(
+        successfulStake(
           index === 0 ? 1234567n : 0n,
           index === 1 ? 2000000n : 0n,
-          6,
         ),
       ),
     )
@@ -76,10 +87,61 @@ describe('holdings reads', () => {
     expect(getPublicClient).toHaveBeenCalledWith(88888)
     expect(batch).toHaveBeenCalledOnce()
     expect(batch.mock.calls[0][2]).toEqual(addresses)
+    expect(batch.mock.calls[0][3]).toEqual({
+      allowFailure: true,
+      blockNumber: 123n,
+    })
+    expect(getBlockNumber).toHaveBeenCalledWith({ cacheTime: 0 })
     expect(result).toHaveLength(2)
+    if (result[0].status !== 'success' || result[1].status !== 'success')
+      throw new Error('Expected available rows')
     expect(result[0].formatted.held).toBe('1.234567')
     expect(result[1].formatted.totalScoutRating).toBe('2')
-    expect(meta).toHaveBeenCalledTimes(addresses.length)
+    expect(result[0].unstaked).toBe(result[0].held)
+    expect(result[1].held).toBe(0n)
+    expect(result[0].blockNumber).toBe(123n)
+  })
+
+  it('retains failed tokens as unavailable without losing successful rows or fabricating zeros', async () => {
+    batch.mockImplementation(async (_client, _user, addresses: string[]) =>
+      addresses.map((_, index) =>
+        index === 0
+          ? { status: 'failure' }
+          : successfulStake(index === 1 ? 1000000n : 0n, 0n),
+      ),
+    )
+    const result = await readHoldings(connection.address as `0x${string}`)
+    expect(result).toHaveLength(2)
+    expect(result[0]).toEqual({
+      key: FAN_TOKENS[0].key,
+      symbol: FAN_TOKENS[0].symbol,
+      status: 'failure',
+      blockNumber: 123n,
+    })
+    expect(result[1].status).toBe('success')
+  })
+
+  it('shares the holdings query with the optimiser and disables reads without an address', async () => {
+    const { result, rerender } = renderHook(
+      ({ address }: { address: `0x${string}` | undefined }) => ({
+        optimiser: useOptimiserPortfolio(address),
+        holdings: useHoldings(),
+      }),
+      {
+        wrapper,
+        initialProps: {
+          address: connection.address as `0x${string}` | undefined,
+        },
+      },
+    )
+    await waitFor(() => expect(result.current.optimiser.data).toEqual([]))
+    expect(result.current.holdings.data).toEqual([])
+    expect(batch).toHaveBeenCalledOnce()
+    connection.isConnected = false
+    rerender({ address: undefined })
+    expect(result.current.optimiser.data).toBeUndefined()
+    expect(result.current.holdings.data).toBeUndefined()
+    expect(batch).toHaveBeenCalledOnce()
   })
 
   it('does not read when disconnected and clears results on disconnect', async () => {
@@ -95,7 +157,7 @@ describe('holdings reads', () => {
   })
 
   it('does not reuse another account’s holdings', async () => {
-    let resolve!: (value: ReturnType<typeof normaliseStake>[]) => void
+    let resolve!: (value: ReturnType<typeof successfulStake>[]) => void
     batch.mockImplementationOnce(
       () =>
         new Promise((done) => {
@@ -108,7 +170,7 @@ describe('holdings reads', () => {
     rerender()
     await waitFor(() => expect(result.current.data).toEqual([]))
     await act(async () => {
-      resolve([normaliseStake(100n, 0n, 0)])
+      resolve([successfulStake(100n, 0n)])
     })
     expect(result.current.data).toEqual([])
   })

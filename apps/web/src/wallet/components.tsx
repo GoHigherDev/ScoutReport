@@ -161,14 +161,18 @@ export function HoldingsStrip() {
               className="min-w-48 rounded-lg border border-sr-border bg-sr-surface p-3"
             >
               <h3 className="font-semibold">{token.symbol}</h3>
-              <dl className="text-sm">
-                <dt>{NAMES.wallet.held}</dt>
-                <dd>{token.formatted.held}</dd>
-                <dt>{NAMES.wallet.staked}</dt>
-                <dd>{token.formatted.staked}</dd>
-                <dt>{NAMES.scoreLabel}</dt>
-                <dd>{token.formatted.totalScoutRating}</dd>
-              </dl>
+              {token.status === 'failure' ? (
+                <p className="text-sm">{NAMES.optimiserCopy.unavailable}</p>
+              ) : (
+                <dl className="text-sm">
+                  <dt>{NAMES.wallet.held}</dt>
+                  <dd>{token.formatted.held}</dd>
+                  <dt>{NAMES.wallet.staked}</dt>
+                  <dd>{token.formatted.staked}</dd>
+                  <dt>{NAMES.scoreLabel}</dt>
+                  <dd>{token.formatted.totalScoutRating}</dd>
+                </dl>
+              )}
             </li>
           ))}
         </ul>

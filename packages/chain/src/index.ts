@@ -21,6 +21,7 @@ export {
   readStakeDataLatestBatch,
   readUnstakePeriod,
   type NormalisedStake,
+  type StakeBatchResult,
   type StakeDataResponse,
 } from './staking.ts'
 export { ChainSwitchRejectedError, ensureChain } from './switch.ts'

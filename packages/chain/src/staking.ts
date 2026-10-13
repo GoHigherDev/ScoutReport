@@ -12,7 +12,7 @@ import {
 } from 'viem'
 import stakingJson from '../abis/staking.json' with { type: 'json' }
 import { chiliz } from './chains.ts'
-import { formatTokenAmount, readTokenMeta } from './tokens.ts'
+import { formatTokenAmount, readTokenMeta, type TokenMeta } from './tokens.ts'
 
 const stakingAbi = stakingJson as Abi
 export const STAKING_ADDRESS: Address =
@@ -100,17 +100,35 @@ export const readStakeDataLatest = async (
  * state. simulateContract disables automatic batching, so use an explicit
  * multicall for portfolio reads rather than one simulation RPC per token.
  */
-export const readStakeDataLatestBatch = async (
+export type StakeBatchResult =
+  | (NormalisedStake & { status: 'success'; meta: TokenMeta })
+  | { status: 'failure' }
+
+export function readStakeDataLatestBatch(
   client: PublicClient,
   user: Address,
   tokens: readonly Address[],
-): Promise<NormalisedStake[]> => {
+  options: { allowFailure: true; blockNumber?: bigint },
+): Promise<StakeBatchResult[]>
+export function readStakeDataLatestBatch(
+  client: PublicClient,
+  user: Address,
+  tokens: readonly Address[],
+  options?: { allowFailure?: false; blockNumber?: bigint },
+): Promise<NormalisedStake[]>
+export async function readStakeDataLatestBatch(
+  client: PublicClient,
+  user: Address,
+  tokens: readonly Address[],
+  options: { allowFailure?: boolean; blockNumber?: bigint } = {},
+): Promise<(NormalisedStake | StakeBatchResult)[]> {
   if (!isAddress(user)) throw new Error(`Invalid wallet address: ${user}`)
   tokens.forEach((token) => validateRead(client, token))
   if (tokens.length === 0) return []
   const [results, metas] = await Promise.all([
     client.multicall({
-      allowFailure: false,
+      allowFailure: true,
+      blockNumber: options.blockNumber,
       contracts: tokens.flatMap((token) => [
         {
           address: STAKING_ADDRESS,
@@ -126,15 +144,35 @@ export const readStakeDataLatestBatch = async (
         },
       ]),
     }),
-    Promise.all(tokens.map((token) => readTokenMeta(chiliz.id, token))),
+    Promise.allSettled(tokens.map((token) => readTokenMeta(chiliz.id, token))),
   ])
-  return tokens.map((_, index) =>
-    normaliseStake(
-      results[index * 2 + 1] as bigint,
-      (results[index * 2] as StakeDataResponse).totalStake,
-      metas[index].decimals,
-    ),
-  )
+  return tokens.map((_, index) => {
+    const stake = results[index * 2]
+    const held = results[index * 2 + 1]
+    const meta = metas[index]
+    if (
+      stake.status === 'failure' ||
+      held.status === 'failure' ||
+      meta.status === 'rejected'
+    ) {
+      if (options.allowFailure) return { status: 'failure' }
+      throw stake.status === 'failure'
+        ? stake.error
+        : held.status === 'failure'
+          ? held.error
+          : meta.status === 'rejected'
+            ? meta.reason
+            : new Error('Token data unavailable.')
+    }
+    const normalised = normaliseStake(
+      held.result as bigint,
+      (stake.result as StakeDataResponse).totalStake,
+      meta.value.decimals,
+    )
+    return options.allowFailure
+      ? { status: 'success', meta: meta.value, ...normalised }
+      : normalised
+  })
 }
 
 /**
