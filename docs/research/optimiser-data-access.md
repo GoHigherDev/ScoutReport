@@ -128,13 +128,23 @@ The earlier SR-30 pending-only AFC samples were 600/300 AFC with
 promised current balances. Non-zero matured claimable remains UNKNOWN.
 
 SR-52 displays pending-only rows without adding pending amounts to liquid or
-Scout Rating balances. Client-side public-RPC reads scan at most 403,201 blocks
-in two non-overlapping `eth_getLogs` chunks of at most 250,000 blocks, filtered
-by staking address, staker and pending tokens. Remaining Unstake amounts after
+Scout Rating balances. Client-side log reads use only the configured public
+PublicNode endpoint, without retries or Ankr fallback. The SR-52 review on
+13 October 2026 measured accepted ranges of 1,000 blocks on Ankr and 50,000
+blocks on PublicNode, correcting the earlier 250,000-block claim. The lookback
+uses the live contract-wide `unstakePeriod()` plus a 10% margin, estimating
+three-second blocks, capped at 250,000 blocks including both endpoints.
+At most five sequential `eth_getLogs` requests of at most 50,000 blocks run,
+stopping at the first error. Reads are filtered by staking address, staker and
+pending tokens. A failed period read also leaves release time unavailable.
+Remaining Unstake amounts after
 Claim events must reconcile with the captured tuple before showing the earliest
 release and operation count in Europe/London. A failed or non-reconciling history
 shows “Release time unavailable”. The displayed period is explicitly the
-contract-wide default; per-token overrides remain unknown. No API route,
+contract-wide default; per-token overrides remain unknown. Once the displayed
+release has passed the chip says “Ready to claim”; for multiple operations this
+refers to the earliest release, not necessarily the whole pending amount.
+No API route,
 subgraph change or write action is involved. Tests use offline SR-30 fixtures
 with the receipt-corrected timestamps above, plus synthetic failure and GMT cases. Non-zero matured claimable remains UNKNOWN.
 

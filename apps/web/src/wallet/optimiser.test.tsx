@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -49,10 +50,54 @@ beforeEach(() => {
   mocks.portfolio.isError = false
   mocks.portfolio.data = []
   mocks.usePortfolio.mockReturnValue(mocks.portfolio)
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-10-13T12:00:00Z'))
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 describe('optimiser checklist', () => {
+  it('changes to Ready to claim at the release boundary without RPC or write actions', () => {
+    const releaseAt = BigInt(pendingFixture.samples[0].claimableAt)
+    vi.setSystemTime(new Date(Number(releaseAt) * 1000 - 1000))
+    mocks.portfolio.data = [
+      {
+        ...row('AFC', 0n, 0n),
+        ...normaliseStake(0n, 0n, 18, 600n * 10n ** 18n),
+        releaseAt,
+        pendingOperationCount: 1,
+      },
+    ]
+    render(<OptimiserPage />)
+    expect(screen.getByText(/Cooling down: 600 AFC/)).toBeInTheDocument()
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+    expect(screen.getByText(/Ready to claim: 600 AFC/)).toBeInTheDocument()
+    expect(screen.queryByText(/Cooling down:/)).not.toBeInTheDocument()
+    expect(mocks.portfolio.refetch).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('renders an already-passed release as ready, retaining the UK release date and count', () => {
+    vi.setSystemTime(new Date('2026-10-20T12:00:00Z'))
+    mocks.portfolio.data = [
+      {
+        ...row('AFC', 0n, 0n),
+        ...normaliseStake(0n, 0n, 18, 600n * 10n ** 18n),
+        releaseAt: BigInt(pendingFixture.samples[0].claimableAt),
+        pendingOperationCount: 2,
+      },
+    ]
+    render(<OptimiserPage />)
+    expect(screen.getByText(/Ready to claim: 600 AFC/)).toHaveTextContent(
+      'available from 19 Oct 2026, 14:52:12 (UK time) · 2 pending unstakes; earliest release shown',
+    )
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
   it.each([
     [pendingFixture.samples[0].claimableAt, '19 Oct 2026, 14:52:12', '600'],
     [pendingFixture.samples[1].claimableAt, '18 Oct 2026, 06:05:17', '300'],

@@ -27,6 +27,7 @@ vi.mock('./chains.ts', async (importOriginal) => {
   return {
     ...original,
     chilizTransport: custom({ request }, { retryCount: 0 }),
+    chilizLogsTransport: custom({ request }, { retryCount: 0 }),
     spicyTransport: custom({ request }, { retryCount: 0 }),
   }
 })
@@ -56,6 +57,7 @@ const setup = async (
   allTokens = false,
   failedRead?: string,
   user = fixture.wallet as Address,
+  periodSeconds = BigInt(fixture.unstakePeriodSeconds),
 ) => {
   const helpers = await import('./index.ts')
   const token = helpers.getTokenAddress(helpers.FAN_TOKENS[0], 88888)!
@@ -85,7 +87,7 @@ const setup = async (
       return encodeFunctionResult({
         abi,
         functionName: 'unstakePeriod',
-        result: BigInt(fixture.unstakePeriodSeconds),
+        result: periodSeconds,
       })
     }
     expect(allowedTokens).toContain(to.toLowerCase())
@@ -495,6 +497,7 @@ describe('pending unstake event reads (offline)', () => {
   async function pendingSetup(
     selected = sample,
     pendingAmount = BigInt(selected.amount) * 10n ** 18n,
+    periodSeconds = BigInt(fixture.unstakePeriodSeconds),
   ) {
     const h = await setup(
       pendingFixture.decimals,
@@ -503,6 +506,7 @@ describe('pending unstake event reads (offline)', () => {
       true,
       undefined,
       getAddress(selected.staker),
+      periodSeconds,
     )
     const token = h.getTokenAddress(
       h.FAN_TOKENS.find((token) => token.key === 'AFC')!,
@@ -592,14 +596,17 @@ describe('pending unstake event reads (offline)', () => {
       const filters = request.mock.calls
         .filter(([rpc]) => rpc.method === 'eth_getLogs')
         .map(([rpc]) => rpc.params[0])
-      expect(filters).toHaveLength(2)
-      expect(BigInt(filters[0].fromBlock)).toBe(snapshot - 403200n)
-      expect(BigInt(filters[1].toBlock)).toBe(snapshot)
-      expect(BigInt(filters[1].fromBlock)).toBe(BigInt(filters[0].toBlock) + 1n)
-      for (const filter of filters) {
+      expect(filters).toHaveLength(5)
+      expect(BigInt(filters[0].fromBlock)).toBe(snapshot - 221760n)
+      expect(BigInt(filters.at(-1).toBlock)).toBe(snapshot)
+      for (const [index, filter] of filters.entries()) {
+        if (index > 0)
+          expect(BigInt(filter.fromBlock)).toBe(
+            BigInt(filters[index - 1].toBlock) + 1n,
+          )
         expect(
           BigInt(filter.toBlock) - BigInt(filter.fromBlock) + 1n,
-        ).toBeLessThanOrEqual(250000n)
+        ).toBeLessThanOrEqual(50000n)
         expect(filter.address).toBe(h.STAKING_ADDRESS)
         expect(filter.topics).toEqual([
           [
@@ -764,7 +771,7 @@ describe('pending unstake event reads (offline)', () => {
     expect(h.calls.filter((call) => call === 'unstakePeriod')).toHaveLength(1)
   })
 
-  it('keeps an event-derived release when the contract-wide default read fails', async () => {
+  it('does not guess a log window when the contract-wide default read fails', async () => {
     const h = await pendingSetup()
     mockLogs([log(h.token, h.user, 'Unstake', amount, snapshot)])
     const reply = request.getMockImplementation()!
@@ -778,9 +785,103 @@ describe('pending unstake event reads (offline)', () => {
       [{ token: h.token, pendingAmount: amount }],
       snapshot,
     )
-    expect(cooldown.releaseAt).toBe(BigInt(sample.claimableAt))
+    expect(cooldown.releaseAt).toBeNull()
     expect(cooldown.unstakePeriodSeconds).toBeNull()
+    expect(
+      request.mock.calls.some(([rpc]) => rpc.method === 'eth_getLogs'),
+    ).toBe(false)
   })
+
+  it.each([
+    [-32062, 1000n, 'Block range is too large'],
+    [-32701, 49999n, 'exceed maximum block range'],
+  ])(
+    'stops immediately on an oversized-range RPC error %i',
+    async (code, limit, message) => {
+      const h = await pendingSetup()
+      const ethCall = request.getMockImplementation()!
+      request.mockImplementation((rpc) => {
+        if (rpc.method !== 'eth_getLogs') return ethCall(rpc)
+        const filter = rpc.params[0]
+        if (BigInt(filter.toBlock) - BigInt(filter.fromBlock) + 1n > limit) {
+          throw Object.assign(new Error(message), { code })
+        }
+        return []
+      })
+      const [cooldown] = await h.readPendingUnstakesBatch(
+        h.client,
+        h.user,
+        [{ token: h.token, pendingAmount: amount }],
+        snapshot,
+      )
+      expect(cooldown).toMatchObject({
+        pendingAmount: amount,
+        releaseAt: null,
+        pendingOperationCount: 0,
+      })
+      expect(
+        request.mock.calls.filter(([rpc]) => rpc.method === 'eth_getLogs'),
+      ).toHaveLength(1)
+    },
+  )
+
+  it('reads sequentially and discards partial results on the first later error', async () => {
+    const h = await pendingSetup()
+    const ethCall = request.getMockImplementation()!
+    let resolve!: (value: ReturnType<typeof log>[]) => void
+    let reads = 0
+    request.mockImplementation((rpc) => {
+      if (rpc.method !== 'eth_getLogs') return ethCall(rpc)
+      reads++
+      if (reads > 1)
+        throw Object.assign(new Error('exceed maximum block range'), {
+          code: -32701,
+        })
+      return new Promise((done) => {
+        resolve = done
+      })
+    })
+    const result = h.readPendingUnstakesBatch(
+      h.client,
+      h.user,
+      [{ token: h.token, pendingAmount: amount }],
+      snapshot,
+    )
+    await vi.waitFor(() => expect(reads).toBe(1))
+    resolve([log(h.token, h.user, 'Unstake', amount, snapshot - 221760n)])
+    expect((await result)[0].releaseAt).toBeNull()
+    expect(reads).toBe(2)
+  })
+
+  it.each([
+    [300n, 110n, 1],
+    [604800n, 221760n, 5],
+    [1209600n, 249999n, 5],
+  ])(
+    'sizes the window from period %s with a margin and hard request budget',
+    async (periodSeconds, lookback, expectedRequests) => {
+      const h = await pendingSetup(sample, amount, periodSeconds)
+      mockLogs([])
+      await h.readPendingUnstakesBatch(
+        h.client,
+        h.user,
+        [{ token: h.token, pendingAmount: amount }],
+        snapshot,
+      )
+      const filters = request.mock.calls
+        .filter(([rpc]) => rpc.method === 'eth_getLogs')
+        .map(([rpc]) => rpc.params[0])
+      expect(filters).toHaveLength(expectedRequests)
+      expect(BigInt(filters[0].fromBlock)).toBe(snapshot - lookback)
+      expect(BigInt(filters.at(-1).toBlock)).toBe(snapshot)
+      expect(
+        filters.every(
+          (filter) =>
+            BigInt(filter.toBlock) - BigInt(filter.fromBlock) + 1n <= 50000n,
+        ),
+      ).toBe(true)
+    },
+  )
 })
 import { execFile } from 'node:child_process'
 import { createServer } from 'node:http'

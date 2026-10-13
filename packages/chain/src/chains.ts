@@ -1,15 +1,15 @@
 import { defineChain, fallback, http } from 'viem'
 import { chiliz as viemChiliz, spicy as viemSpicy } from 'viem/chains'
 
+const publicNodeRpcUrl = 'https://chiliz-rpc.publicnode.com'
 const mainnetRpcUrl =
   typeof process === 'undefined'
     ? 'https://rpc.ankr.com/chiliz'
     : process.env.RPC_URL_MAINNET || 'https://rpc.ankr.com/chiliz'
 const mainnetFallbackRpcUrl =
   typeof process === 'undefined'
-    ? 'https://chiliz-rpc.publicnode.com'
-    : process.env.RPC_URL_MAINNET_FALLBACK ||
-      'https://chiliz-rpc.publicnode.com'
+    ? publicNodeRpcUrl
+    : process.env.RPC_URL_MAINNET_FALLBACK || publicNodeRpcUrl
 const mainnetWsUrl =
   typeof process === 'undefined'
     ? 'wss://chiliz-rpc.publicnode.com'
@@ -73,5 +73,7 @@ export const chilizTransport = fallback([
   http(mainnetRpcUrl),
   http(mainnetFallbackRpcUrl),
 ])
+
+export const chilizLogsTransport = http(publicNodeRpcUrl, { retryCount: 0 })
 
 export const spicyTransport = fallback([http(spicyRpcUrl)])

@@ -20,6 +20,7 @@ export const NAMES = {
     noAction: '—',
     captureBlock: 'Capture block',
     coolingDown: 'Cooling down',
+    readyToClaim: 'Ready to claim',
     availableFrom: 'available from',
     ukTime: '(UK time)',
     releaseUnavailable: 'Release time unavailable',

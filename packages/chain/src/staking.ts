@@ -15,6 +15,7 @@ import {
 } from 'viem'
 import stakingJson from '../abis/staking.json' with { type: 'json' }
 import { chiliz } from './chains.ts'
+import { getStakingLogClient } from './clients.ts'
 import { formatTokenAmount, readTokenMeta, type TokenMeta } from './tokens.ts'
 
 const stakingAbi = stakingJson as Abi
@@ -214,9 +215,15 @@ export type PendingUnstake = {
   pendingOperationCount: number
 }
 
+export const UNSTAKE_LOG_CHUNK_BLOCKS = 50000n
+export const MAX_UNSTAKE_LOG_REQUESTS = 5
+const BLOCK_TIME_SECONDS = 3n
+const LOOKBACK_MARGIN_PERCENT = 10n
+
 /**
- * The maximum recorded cooldown is 1,209,600 seconds (~403,200 three-second
- * blocks). Two non-overlapping reads stay within the public RPC's 250k cap.
+ * PublicNode permits 50k-block log ranges (SR-52 review, 13 October 2026).
+ * Look back the live default period plus 10%, estimating three-second blocks.
+ * At most five sequential requests run without retries or Ankr fallback.
  * Incomplete history must never produce a guessed release deadline.
  */
 export async function readPendingUnstakesBatch(
@@ -228,17 +235,19 @@ export async function readPendingUnstakesBatch(
   if (!isAddress(user)) throw new Error(`Invalid wallet address: ${user}`)
   tokens.forEach(({ token }) => validateRead(client, token))
   if (tokens.length === 0) return []
-  const period = readUnstakePeriod(client, tokens[0].token, blockNumber).catch(
-    () => null,
-  )
+  const unstakePeriodSeconds = await readUnstakePeriod(
+    client,
+    tokens[0].token,
+    blockNumber,
+  ).catch(() => null)
   const result: PendingUnstake[] = tokens.map(({ pendingAmount }) => ({
     pendingAmount,
     releaseAt: null,
-    unstakePeriodSeconds: null,
+    unstakePeriodSeconds,
     pendingOperationCount: 0,
   }))
   const pending = tokens.filter(({ pendingAmount }) => pendingAmount > 0n)
-  if (pending.length > 0) {
+  if (pending.length > 0 && unstakePeriodSeconds !== null) {
     try {
       const unstakeTopics = encodeEventTopics({
         abi: stakingAbi,
@@ -249,21 +258,27 @@ export async function readPendingUnstakesBatch(
         abi: stakingAbi,
         eventName: 'Claim',
       })
-      const from = blockNumber > 403200n ? blockNumber - 403200n : 0n
-      const ranges = []
-      for (let start = from; start <= blockNumber; start += 250000n) {
-        ranges.push({
-          fromBlock: `0x${start.toString(16)}` as const,
-          toBlock: `0x${(start + 249999n < blockNumber
-            ? start + 249999n
-            : blockNumber
-          ).toString(16)}` as const,
-        })
-      }
-      const logs = (
-        await Promise.all(
-          ranges.map((range) =>
-            client.request({
+      const periodBlocks =
+        (unstakePeriodSeconds + BLOCK_TIME_SECONDS - 1n) / BLOCK_TIME_SECONDS
+      const marginBlocks = (periodBlocks * LOOKBACK_MARGIN_PERCENT + 99n) / 100n
+      const budgetBlocks =
+        UNSTAKE_LOG_CHUNK_BLOCKS * BigInt(MAX_UNSTAKE_LOG_REQUESTS)
+      const lookbackBlocks = periodBlocks + marginBlocks + 1n
+      const windowBlocks =
+        lookbackBlocks < budgetBlocks ? lookbackBlocks : budgetBlocks
+      const from =
+        blockNumber + 1n > windowBlocks ? blockNumber + 1n - windowBlocks : 0n
+      const logClient = getStakingLogClient()
+      const logs = []
+      for (
+        let start = from, requests = 0;
+        start <= blockNumber && requests < MAX_UNSTAKE_LOG_REQUESTS;
+        start += UNSTAKE_LOG_CHUNK_BLOCKS, requests++
+      ) {
+        const end = start + UNSTAKE_LOG_CHUNK_BLOCKS - 1n
+        logs.push(
+          ...(await logClient.request(
+            {
               method: 'eth_getLogs',
               params: [
                 {
@@ -272,13 +287,15 @@ export async function readPendingUnstakesBatch(
                     [unstakeTopics[0] as Hex, claimTopics[0] as Hex],
                     ...unstakeTopics.slice(1),
                   ],
-                  ...range,
+                  fromBlock: `0x${start.toString(16)}`,
+                  toBlock: `0x${(end < blockNumber ? end : blockNumber).toString(16)}`,
                 },
               ],
-            }),
-          ),
+            },
+            { retryCount: 0 },
+          )),
         )
-      ).flat()
+      }
       logs.sort((a, b) => {
         const difference = BigInt(a.blockNumber!) - BigInt(b.blockNumber!)
         return difference === 0n
@@ -348,6 +365,5 @@ export async function readPendingUnstakesBatch(
       // Keep the tuple's amount even when the bounded history is unavailable.
     }
   }
-  const unstakePeriodSeconds = await period
-  return result.map((item) => ({ ...item, unstakePeriodSeconds }))
+  return result
 }
