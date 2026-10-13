@@ -49,7 +49,6 @@ export type RpResult =
   | { state: 'empty' | 'undeclared' | 'ineligible' | 'unavailable' }
   | {
       state: 'estimate'
-      total: RpField
       perToken: RpField
       widened: boolean
       calibration?: RpCalibration
@@ -91,26 +90,13 @@ export function usableCalibration(calibration: RpCalibration, now: number) {
 export const round2sf = (value: number) =>
   value === 0 ? 0 : Number(value.toPrecision(2))
 
-const fullPrecision = new WeakMap<
-  RpField,
-  { central: number; low: number; high: number }
->()
-
 function field(central: number, low: number, high: number): RpField {
-  const bounds = {
-    central,
-    low: Math.max(0, Math.min(low, central)),
-    high: Math.max(high, central),
-  }
-  const result: RpField = {
+  return {
     kind: 'estimate',
     central: round2sf(central),
-    low: round2sf(bounds.low),
-    high: round2sf(bounds.high),
+    low: round2sf(Math.max(0, Math.min(low, central))),
+    high: round2sf(Math.max(high, central)),
   }
-  // Aggregate before presentation rounding, without exposing another RP field.
-  fullPrecision.set(result, bounds)
-  return result
 }
 
 function quantile(sorted: readonly number[], fraction: number) {
@@ -141,7 +127,6 @@ export function estimateRp(input: {
   ) {
     return {
       state: 'estimate',
-      total: field(0, 0, 0),
       perToken: field(0, 0, 0),
       widened: false,
       eligible: false,
@@ -216,24 +201,6 @@ export function estimateRp(input: {
     widened,
     calibration,
     snapshot,
-    total: field(central, low, high),
     perToken: field(central / heldTokens, low / heldTokens, high / heldTokens),
   }
-}
-
-export function totalRp(results: readonly RpResult[]): RpField | undefined {
-  if (
-    !results.length ||
-    results.some((result) => result.state !== 'estimate' || !result.eligible)
-  )
-    return undefined
-  const estimates = results
-    .filter((result) => result.state === 'estimate')
-    .map((result) => fullPrecision.get(result.total) ?? result.total)
-  const central = estimates.reduce((sum, result) => sum + result.central, 0)
-  const low = estimates.reduce((sum, result) => sum + result.low, 0)
-  const high = estimates.reduce((sum, result) => sum + result.high, 0)
-  if (![central, low, high].every((value) => Number.isFinite(round2sf(value))))
-    return undefined
-  return field(central, low, high)
 }

@@ -143,9 +143,9 @@ central × exp(q × sqrt(1 + 1 / distinct reporters)), where q is its holdout lo
 residual quantile. The small-sample factor widens the band in log space; interval
 bounds also include the central estimate. Overflow or non-finite results are
 unavailable. Figures use two significant figures and every
-RP field is tagged `kind: 'estimate'`. A total is withheld if any current holding
-lacks a valid calibrated estimate; summed interval bounds are conservative,
-not an independence claim.
+RP field is tagged `kind: 'estimate'`. The panel shows only estimated points per
+token currently held, in configured `FAN_TOKENS` order with stable token-key
+fallbacks for unknown tokens. It shows no totals, rankings or buy/stake links.
 
 Coverage counts ownership only when liquid held + active staked totals at least
 one whole on-chain token, excluding dust and pending-only rows, and counts a token

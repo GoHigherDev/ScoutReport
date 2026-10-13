@@ -186,8 +186,12 @@ describe('connected-owner RP panel', () => {
       name: copy.title,
     }).textContent!
     expect(content.replace(NAMES.optimiserCopy.caveats[2], '')).not.toMatch(
-      /cost|buy|ranking|yield|APY|guaranteed/i,
+      /cost|price|buy|purchas|rank|extra.token|yield|APY|guaranteed/i,
     )
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /buy|purchas|stake/i }),
+    ).not.toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(mocks.read).not.toHaveBeenCalled()
@@ -232,11 +236,12 @@ describe('connected-owner RP panel', () => {
         ),
       ).toBeInTheDocument(),
     )
+    expect(within(panel).getAllByText(/Estimate: .*RP/)).toHaveLength(1)
+    expect(panel).not.toHaveTextContent(/total|cost|price|buy|purchas|rank/i)
+    expect(within(panel).queryByRole('link')).not.toBeInTheDocument()
     expect(
-      within(panel).getAllByText(
-        `${copy.total}: Estimate: 22–28 RP (central 25)`,
-      ),
-    ).toHaveLength(2)
+      within(panel).queryByRole('button', { name: /buy|purchas|stake/i }),
+    ).not.toBeInTheDocument()
     expect(
       within(panel).getByText(/^Based on 10 user reports, calibrated .*.$/),
     ).toBeInTheDocument()
@@ -244,7 +249,7 @@ describe('connected-owner RP panel', () => {
     fireEvent.click(screen.getByRole('checkbox'))
     expect(within(panel).queryByText(/Estimate: .*RP/)).not.toBeInTheDocument()
   })
-  it('does not sum missing current holdings or substitute zero for failures', async () => {
+  it('preserves missing current holdings and failures rather than substituting zero', async () => {
     mocks.calibrations.push(calibration())
     const rows = [
       row(),
@@ -268,6 +273,60 @@ describe('connected-owner RP panel', () => {
       'unavailable',
     ])
     expect(mocks.read).toHaveBeenCalledOnce()
+  })
+  it('keeps configured token order and stable unknown fallbacks regardless of RP results', async () => {
+    const secondKey = FAN_TOKENS[1].key
+    mocks.calibrations.push(calibration(), {
+      ...calibration(),
+      tokenKey: secondKey,
+      theta: 12340,
+    })
+    const rows = [row('unknown-z'), row(secondKey), row('unknown-a'), row()]
+    const { rerender } = render(<RpEstimatePanel rows={rows} />, { wrapper })
+    fireEvent.click(screen.getByRole('checkbox'))
+    const panel = screen.getByRole('region', { name: copy.title })
+    const expected = [key, secondKey, 'unknown-a', 'unknown-z']
+    const headings = () =>
+      within(panel)
+        .getAllByRole('heading', { level: 3 })
+        .map((heading) => heading.textContent)
+    expect(headings()).toEqual(expected)
+    await waitFor(() =>
+      expect(within(panel).getAllByText(/Estimate: .*RP/)).toHaveLength(2),
+    )
+    expect(headings()).toEqual(expected)
+    const items = within(panel)
+      .getByRole('heading', { name: key })
+      .closest('li')!
+    expect(items).toHaveTextContent(
+      'Estimated points per token you hold: Estimate: 4.4–5.6 RP (central 4.9)',
+    )
+    const secondItem = within(panel)
+      .getByRole('heading', { name: secondKey })
+      .closest('li')!
+    expect(secondItem).toHaveTextContent(
+      'Estimated points per token you hold: Estimate: 44–56 RP (central 49)',
+    )
+    expect(panel).not.toHaveTextContent(/total|cost|price|buy|purchas|rank/i)
+    expect(within(panel).queryByRole('link')).not.toBeInTheDocument()
+    expect(
+      within(panel).queryByRole('button', { name: /buy|purchas|stake/i }),
+    ).not.toBeInTheDocument()
+    rerender(<RpEstimatePanel rows={[...rows].reverse()} />)
+    expect(headings()).toEqual(expected)
+    await waitFor(() =>
+      expect(within(panel).getAllByText(/Estimate: .*RP/)).toHaveLength(2),
+    )
+    expect(headings()).toEqual(expected)
+    mocks.calibrations[0] = { ...mocks.calibrations[0], theta: 123400 }
+    fireEvent.click(screen.getByRole('button', { name: copy.refresh }))
+    await waitFor(() =>
+      expect(items).toHaveTextContent(
+        'Estimated points per token you hold: Estimate: 440–560 RP (central 490)',
+      ),
+    )
+    expect(mocks.read).toHaveBeenCalledTimes(6)
+    expect(headings()).toEqual(expected)
   })
   it('hides already-loaded figures immediately when switching addresses and restores only that address’s declaration', async () => {
     mocks.calibrations.push(calibration())
@@ -366,9 +425,6 @@ describe('connected-owner RP panel', () => {
       ).toBeInTheDocument(),
     )
     expect(screen.getByText(copy.widened)).toHaveTextContent('recalibrating')
-    expect(
-      screen.getAllByText(`${copy.total}: Estimate: 21–29 RP (central 25)`),
-    ).toHaveLength(2)
   })
   it.each(['failure', 'upgrade'])('hides %s snapshots', async (reason) => {
     mocks.calibrations.push(calibration())

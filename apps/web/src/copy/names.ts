@@ -48,7 +48,6 @@ export const NAMES = {
       subtitle:
         'Estimated Reward Points for the tokens you already hold in this wallet.',
       perToken: 'Estimated points per token you hold',
-      total: 'Estimated total for your current holdings',
       range: 'Estimate: {low}–{high} RP (central {central})',
       footnote: 'Based on {n} user reports, calibrated {date}.',
       empty: 'Not enough reported data to estimate',
@@ -65,8 +64,6 @@ export const NAMES = {
         'Estimate recalibrating: the range is wider because calibration or snapshot reads are stale, a drift alert is open, or pool stake has changed.',
       basis:
         'The daily estimate uses stake at the last block before midnight UTC, excluding pending unstake. Per-token figures divide that estimate by your current held plus staked tokens; liquid holdings alone do not earn staking RP.',
-      totalUnavailable:
-        'A total is unavailable unless every current holding has a valid estimate.',
       refresh: 'Refresh estimate',
     },
     earnRoutes: {

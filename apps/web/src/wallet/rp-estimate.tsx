@@ -11,7 +11,6 @@ import {
   estimateRp,
   RP_CALIBRATIONS,
   RP_POLICY,
-  totalRp,
   usableCalibration,
   type RpCalibration,
   type RpField,
@@ -21,6 +20,8 @@ import { getRpSnapshotReader } from './rp-snapshot'
 
 const declarationKey = (address: string) =>
   `scoutreport:rp-declaration:${address.toLowerCase()}`
+
+const tokenOrder = new Map(FAN_TOKENS.map((token, index) => [token.key, index]))
 
 export function useSociosDeclaration(address?: Address) {
   const [stored, setStored] = useState<{ address: string; declared: boolean }>()
@@ -117,9 +118,6 @@ function Result({ result }: { result: RpResult }) {
       <p>
         {copy.perToken}: {rpRange(result.perToken)}
       </p>
-      <p>
-        {copy.total}: {rpRange(result.total)}
-      </p>
       {result.widened && <p>{copy.widened}</p>}
       {result.calibration && (
         <p>
@@ -150,9 +148,14 @@ export function RpEstimatePanel({
   const { declared, setDeclared } = useSociosDeclaration(owner)
   const [clock, setClock] = useState(Date.now)
   const now = Math.max(clock, Date.now())
-  const current = rows.filter(
-    (row) => row.status === 'failure' || row.held + row.staked > 0n,
-  )
+  const current = rows
+    .filter((row) => row.status === 'failure' || row.held + row.staked > 0n)
+    .sort(
+      (a, b) =>
+        (tokenOrder.get(a.key) ?? FAN_TOKENS.length) -
+          (tokenOrder.get(b.key) ?? FAN_TOKENS.length) ||
+        (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
+    )
   const query = useQuery({
     queryKey: [
       'rp-estimate',
@@ -245,7 +248,6 @@ export function RpEstimatePanel({
           })
         })
       : undefined
-  const total = results && totalRp(results)
   if (!owner) return null
   return (
     <section
@@ -308,13 +310,6 @@ export function RpEstimatePanel({
                   </li>
                 ))}
               </ul>
-              {total ? (
-                <p>
-                  {copy.total}: {rpRange(total)}
-                </p>
-              ) : (
-                <p>{copy.totalUnavailable}</p>
-              )}
               {RP_CALIBRATIONS.some((calibration) =>
                 usableCalibration(calibration, now),
               ) && (

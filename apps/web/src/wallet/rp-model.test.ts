@@ -3,7 +3,6 @@ import {
   estimateRp,
   RP_CALIBRATIONS,
   RP_POLICY,
-  totalRp,
   usableCalibration,
   type RpCalibration,
   type RpSnapshot,
@@ -87,20 +86,15 @@ describe('RP model', () => {
     const result = estimateRp(input)
     expect(result.state).toBe('estimate')
     if (result.state !== 'estimate') throw new Error('Expected an estimate')
-    expect(result.total).toEqual({
-      kind: 'estimate',
-      central: 25,
-      low: 22,
-      high: 28,
-    })
     expect(result.perToken).toEqual({
       kind: 'estimate',
       central: 4.9,
       low: 4.4,
       high: 5.6,
     })
-    expect(result.total.low).toBeLessThanOrEqual(result.total.central)
-    expect(result.total.high).toBeGreaterThanOrEqual(result.total.central)
+    expect(result).not.toHaveProperty('total')
+    expect(result.perToken.low).toBeLessThanOrEqual(result.perToken.central)
+    expect(result.perToken.high).toBeGreaterThanOrEqual(result.perToken.central)
     expect(result.widened).toBe(false)
   })
   it.each([
@@ -141,10 +135,8 @@ describe('RP model', () => {
         state: 'estimate',
         eligible: false,
         widened: false,
-        total: { kind: 'estimate', central: 0, low: 0, high: 0 },
         perToken: { kind: 'estimate', central: 0, low: 0, high: 0 },
       })
-      expect(totalRp([result])).toBeUndefined()
     },
   )
   it('widens from P10/P90 to P5/P95 for stale calibration/reads or supplied/pool drift', () => {
@@ -174,9 +166,9 @@ describe('RP model', () => {
       if (result.state !== 'estimate' || normal.state !== 'estimate')
         throw new Error('Expected estimates')
       expect(result.widened).toBe(true)
-      expect(result.total.low).toBeLessThan(normal.total.low)
-      expect(result.total.high).toBeGreaterThan(normal.total.high)
-      expect(result.total.central).toBe(normal.total.central)
+      expect(result.perToken.low).toBeLessThan(normal.perToken.low)
+      expect(result.perToken.high).toBeGreaterThan(normal.perToken.high)
+      expect(result.perToken.central).toBe(normal.perToken.central)
     }
   })
   it('uses multiplicative holdout log residuals with small-sample inflation', () => {
@@ -189,19 +181,19 @@ describe('RP model', () => {
     })
     expect(result.state).toBe('estimate')
     if (result.state !== 'estimate') throw new Error('Expected an estimate')
-    expect(result.total.low).toBe(
-      Number((24.68 * 0.8 ** Math.sqrt(1.2)).toPrecision(2)),
+    expect(result.perToken.low).toBe(
+      Number(((24.68 * 0.8 ** Math.sqrt(1.2)) / 5).toPrecision(2)),
     )
-    expect(result.total.high).toBe(
-      Number((24.68 * 1.2 ** Math.sqrt(1.2)).toPrecision(2)),
+    expect(result.perToken.high).toBe(
+      Number(((24.68 * 1.2 ** Math.sqrt(1.2)) / 5).toPrecision(2)),
     )
     const scaled = estimateRp({
       ...input,
       calibration: { ...calibration, theta: 12340, residuals },
     })
     if (scaled.state !== 'estimate') throw new Error('Expected an estimate')
-    expect(scaled.total.low).toBe(result.total.low * 10)
-    expect(scaled.total.high).toBe(result.total.high * 10)
+    expect(scaled.perToken.low).toBe(result.perToken.low * 10)
+    expect(scaled.perToken.high).toBe(result.perToken.high * 10)
   })
   it('hides exponential overflow and indeterminate quantiles', () => {
     for (const residuals of [
@@ -223,30 +215,5 @@ describe('RP model', () => {
         snapshot: { ...snapshot, stake: snapshot.poolStake },
       }),
     ).toEqual({ state: 'unavailable' })
-  })
-  it('withholds totals that overflow before or after presentation rounding', () => {
-    const result = estimateRp({
-      ...input,
-      calibration: {
-        ...calibration,
-        theta: 1e308,
-        residuals: Array<number>(10).fill(0),
-      },
-      snapshot: { ...snapshot, stake: snapshot.poolStake },
-    })
-    expect(result.state).toBe('estimate')
-    expect(totalRp([result, result])).toBeUndefined()
-  })
-  it('totals only a complete set of valid calibrated current holdings, never failed/ineligible rows', () => {
-    const result = estimateRp(input)
-    expect(totalRp([result, result])).toEqual({
-      kind: 'estimate',
-      central: 49,
-      low: 44,
-      high: 56,
-    })
-    expect(totalRp([result, { state: 'empty' }])).toBeUndefined()
-    expect(totalRp([result, { state: 'unavailable' }])).toBeUndefined()
-    expect(totalRp([])).toBeUndefined()
   })
 })
