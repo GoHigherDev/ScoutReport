@@ -12,7 +12,11 @@ import {
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { buildDeploymentRecord, collectEvidence } from './record-deployment.mjs'
+import {
+  buildDeploymentRecord,
+  collectEvidence,
+  mergeDeploymentRecords,
+} from './record-deployment.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const gitSha = 'a'.repeat(40)
@@ -340,7 +344,11 @@ test('CLI writes only the sanitised record and allowlisted evidence', () => {
     copyFileSync(resolve(root, 'scripts/record-deployment.mjs'), script)
     const broadcast = resolve(directory, 'broadcast.json')
     writeFileSync(broadcast, JSON.stringify(fixture()))
-    for (const name of ['MockSociosStaking', 'MockFanToken']) {
+    for (const name of [
+      'MockSociosStaking',
+      'MockFanToken',
+      'ScoutReportPredictions',
+    ]) {
       const artifactDirectory = resolve(directory, 'out', `${name}.sol`)
       mkdirSync(artifactDirectory, { recursive: true })
       writeFileSync(
@@ -359,6 +367,7 @@ test('CLI writes only the sanitised record and allowlisted evidence', () => {
       '#!/bin/sh\ncase "$2" in\n' +
         '  src/mocks/MockSociosStaking.sol) printf "pragma solidity 0.8.30;\\ncontract MockSociosStaking {}\\n" ;;\n' +
         '  src/mocks/MockFanToken.sol) printf "pragma solidity 0.8.30;\\ncontract MockFanToken {}\\n" ;;\n' +
+        '  src/ScoutReportPredictions.sol) printf "pragma solidity 0.8.30;\\ncontract ScoutReportPredictions {}\\n" ;;\n' +
         '  *) exit 1 ;;\nesac\n',
     )
     chmodSync(forge, 0o755)
@@ -398,6 +407,43 @@ test('CLI writes only the sanitised record and allowlisted evidence', () => {
         ),
       )
     }
+    writeFileSync(broadcast, JSON.stringify(predictionFixture()))
+    const predictionsResult = spawnSync(
+      process.execPath,
+      [script, broadcast, actualSha, 'predictions'],
+      {
+        cwd: directory,
+        env: {
+          ...process.env,
+          PATH: `${resolve(directory, 'bin')}:${process.env.PATH}`,
+        },
+        encoding: 'utf8',
+      },
+    )
+    assert.equal(predictionsResult.status, 0, predictionsResult.stderr)
+    const merged = JSON.parse(
+      readFileSync(resolve(directory, 'deployments/88882.json'), 'utf8'),
+    )
+    assert.deepEqual(
+      merged,
+      mergeDeploymentRecords(
+        deployment,
+        buildDeploymentRecord(predictionFixture(), actualSha, 'predictions'),
+      ),
+    )
+    assert.equal(readdirSync(evidenceDirectory).length, 8)
+    assert.equal(
+      readFileSync(resolve(evidenceDirectory, 'commit.txt'), 'utf8'),
+      `${actualSha}\n`,
+    )
+    assert.equal(
+      readFileSync(
+        resolve(evidenceDirectory, 'ScoutReportPredictions.commit.txt'),
+        'utf8',
+      ),
+      `${actualSha}\n`,
+    )
+    assert.ok(!JSON.stringify(merged).includes('DO_NOT_PUBLISH'))
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
@@ -427,7 +473,9 @@ test('workflow is dispatch-only, reuses pinned actions and stages only public ev
   assert.match(workflow, /pull-requests: write/)
   assert.match(workflow, /contents: write/)
   assert.equal(workflow.match(/GH_TOKEN:/g).length, 1)
-  assert.match(workflow, /--title "SR-16:/)
+  assert.match(workflow, /title="SR-16:/)
+  assert.match(workflow, /title="SR-42:/)
+  assert.match(workflow, /--title "\$title"/)
   assert.match(workflow, /> broadcast\/workflow\.log 2>&1/)
   assert.ok(workflow.includes('echo "::add-mask::$SPICY_DEPLOYER_PRIVATE_KEY"'))
   assert.ok(
@@ -435,10 +483,121 @@ test('workflow is dispatch-only, reuses pinned actions and stages only public ev
       workflow.indexOf('if ! forge script'),
   )
   const staged = workflow
-    .split('git add -- \\\n')[1]
+    .split('git add -- packages/contracts/deployments/88882.json')[1]
     .split('\n          git config')[0]
-  assert.equal(staged.match(/packages\/contracts\/deployments\//g).length, 6)
+  assert.equal(staged.match(/packages\/contracts\/deployments\//g).length, 8)
   assert.doesNotMatch(staged, /broadcast|out\/|git add \./)
+})
+
+function predictionFixture() {
+  const broadcast = fixture()
+  broadcast.transactions = [broadcast.transactions[0]]
+  broadcast.transactions[0].contractName = 'ScoutReportPredictions'
+  broadcast.receipts = [broadcast.receipts[0]]
+  return broadcast
+}
+
+test('records a confirmed predictions deployment and preserves mocks and source commits', () => {
+  const previous = buildDeploymentRecord(fixture(), gitSha)
+  const nextSha = 'b'.repeat(40)
+  const predictions = buildDeploymentRecord(
+    predictionFixture(),
+    nextSha,
+    'predictions',
+  )
+  const merged = mergeDeploymentRecords(previous, predictions)
+  for (const name of names) {
+    assert.deepEqual(merged.contracts[name], {
+      ...previous.contracts[name],
+      gitSha,
+    })
+  }
+  assert.deepEqual(merged.contracts.ScoutReportPredictions, {
+    ...predictions.contracts.ScoutReportPredictions,
+    gitSha: nextSha,
+  })
+  const redeployedMocks = mergeDeploymentRecords(merged, previous)
+  assert.deepEqual(
+    redeployedMocks.contracts.ScoutReportPredictions,
+    merged.contracts.ScoutReportPredictions,
+  )
+  assert.ok(!JSON.stringify(merged).includes('DO_NOT_PUBLISH'))
+})
+
+test('preserves pending mock slots without claiming addresses or source commits', () => {
+  const previous = {
+    chainId: 88882,
+    status: 'PENDING',
+    contracts: Object.fromEntries(names.map((name) => [name, null])),
+  }
+  const merged = mergeDeploymentRecords(
+    previous,
+    buildDeploymentRecord(predictionFixture(), gitSha, 'predictions'),
+  )
+  names.forEach((name) => assert.equal(merged.contracts[name], null))
+  assert.equal(merged.status, 'DEPLOYED')
+})
+
+test('predictions selection refuses mocks, malformed constructors and unconfirmed receipts', () => {
+  assert.throws(() => buildDeploymentRecord(fixture(), gitSha, 'predictions'))
+  assert.throws(() => buildDeploymentRecord(predictionFixture(), gitSha))
+  assert.throws(() =>
+    buildDeploymentRecord(predictionFixture(), gitSha, 'mainnet'),
+  )
+  for (const name of [
+    'Mainnet broadcast',
+    'wrong transaction chain',
+    'failed receipt',
+    'pending transaction',
+    'missing receipt',
+    'extra transaction',
+    'missing matching receipt',
+    'non-creation transaction',
+    'additional deployment',
+    'mismatched address',
+    'zero deployment block',
+  ]) {
+    const broadcast = predictionFixture()
+    invalidCases[name](broadcast)
+    assert.throws(() => buildDeploymentRecord(broadcast, gitSha, 'predictions'))
+  }
+  for (const args of [[], [owner, owner], [`0x${'0'.repeat(40)}`]]) {
+    const broadcast = predictionFixture()
+    broadcast.transactions[0].arguments = args
+    assert.throws(() => buildDeploymentRecord(broadcast, gitSha, 'predictions'))
+  }
+  assert.throws(() =>
+    mergeDeploymentRecords(
+      { chainId: 88888 },
+      buildDeploymentRecord(predictionFixture(), gitSha, 'predictions'),
+    ),
+  )
+})
+
+test('predictions evidence is separately allowlisted and leaves mock commit evidence intact', () => {
+  const evidence = collectEvidence(
+    gitSha,
+    {
+      readArtifact: (name) => {
+        assert.equal(name, 'ScoutReportPredictions')
+        return {
+          abi: [
+            { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+          ],
+        }
+      },
+      flatten: (source) => {
+        assert.equal(source, 'src/ScoutReportPredictions.sol')
+        return 'pragma solidity 0.8.30; contract ScoutReportPredictions {}'
+      },
+    },
+    'predictions',
+  )
+  assert.deepEqual(Object.keys(evidence), [
+    'ScoutReportPredictions.commit.txt',
+    'ScoutReportPredictions.abi.json',
+    'ScoutReportPredictions.flattened.sol',
+  ])
 })
 
 test('workflow explicitly rejects non-Spicy and non-dispatch execution', () => {
@@ -463,6 +622,35 @@ test('workflow explicitly rejects non-Spicy and non-dispatch execution', () => {
       },
       encoding: 'utf8',
     })
+
     assert.equal(result.status, status)
+  }
+})
+
+test('workflow selects only the two allowlisted scripts', () => {
+  const workflow = readFileSync(
+    resolve(root, '../../.github/workflows/deploy-contracts.yml'),
+    'utf8',
+  )
+  const selection = workflow
+    .split('      - name: Select allowlisted deployment\n')[1]
+    .split('        run: |\n')[1]
+    .split('\n      - name:')[0]
+  for (const [target, script] of [
+    ['mocks', 'DeployChatMocks'],
+    ['predictions', 'DeployPredictions'],
+    ['mainnet', null],
+    ['', null],
+  ]) {
+    const result = spawnSync(
+      'bash',
+      ['-e', '-c', selection.replaceAll('>> "$GITHUB_ENV"', '')],
+      {
+        env: { ...process.env, DEPLOYMENT_TARGET: target },
+        encoding: 'utf8',
+      },
+    )
+    assert.equal(result.status, script ? 0 : 1)
+    if (script) assert.equal(result.stdout.trim(), `DEPLOY_SCRIPT=${script}`)
   }
 })

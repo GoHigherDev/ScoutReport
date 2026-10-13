@@ -10,6 +10,14 @@ on:
         default: spicy
         options:
           - spicy
+      contract:
+        description: Contracts to deploy
+        type: choice
+        required: true
+        default: mocks
+        options:
+          - mocks
+          - predictions
 
 permissions:
   contents: read
@@ -32,6 +40,7 @@ jobs:
         working-directory: packages/contracts
     env:
       RPC_URL: https://spicy-rpc.chiliz.com/
+      DEPLOYMENT_TARGET: ${{ inputs.contract }}
     steps:
       - name: Refuse non-Spicy requests
         working-directory: .
@@ -48,10 +57,21 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
         with:
           version: v1.8.5
-      - name: Validate mocks and Spicy RPC
+      - name: Select allowlisted deployment
+        run: |
+          case "$DEPLOYMENT_TARGET" in
+            mocks) echo "DEPLOY_SCRIPT=DeployChatMocks" >> "$GITHUB_ENV" ;;
+            predictions) echo "DEPLOY_SCRIPT=DeployPredictions" >> "$GITHUB_ENV" ;;
+            *) echo "::error::Unknown contract selection."; exit 1 ;;
+          esac
+      - name: Install contract dependencies
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+      - name: Validate contracts and Spicy RPC
         run: |
           node --test scripts/*.test.mjs
           forge fmt --check
@@ -61,7 +81,7 @@ jobs:
             echo "::error::RPC must report Spicy chain 88882."
             exit 1
           fi
-      - name: Broadcast Spicy mocks
+      - name: Broadcast selected Spicy contracts
         env:
           SPICY_DEPLOYER_PRIVATE_KEY: ${{ secrets.SPICY_DEPLOYER_PRIVATE_KEY }}
         run: |
@@ -72,7 +92,7 @@ jobs:
           echo "::add-mask::$SPICY_DEPLOYER_PRIVATE_KEY"
           mkdir -p broadcast
           # Keep raw output and broadcast data ignored; never print or upload it.
-          if ! forge script script/DeployChatMocks.s.sol:DeployChatMocks \
+          if ! forge script "script/${DEPLOY_SCRIPT}.s.sol:${DEPLOY_SCRIPT}" \
             --rpc-url "$RPC_URL" --chain 88882 --broadcast --slow \
             > broadcast/workflow.log 2>&1; then
             echo "::error::Spicy broadcast failed; no raw transaction data is published."
@@ -84,23 +104,37 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           node scripts/record-deployment.mjs \
-            broadcast/DeployChatMocks.s.sol/88882/run-latest.json "$GITHUB_SHA"
+            "broadcast/${DEPLOY_SCRIPT}.s.sol/88882/run-latest.json" "$GITHUB_SHA" "$DEPLOYMENT_TARGET"
           cd ../..
-          branch="SR-16/spicy-deployment-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [ "$DEPLOYMENT_TARGET" = predictions ]; then
+            ticket=SR-42
+            title="SR-42: record Spicy predictions deployment"
+          else
+            ticket=SR-16
+            title="SR-16: record Spicy mock deployment"
+          fi
+          branch="$ticket/spicy-deployment-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git switch -c "$branch"
-          git add -- \
-            packages/contracts/deployments/88882.json \
-            packages/contracts/deployments/evidence/88882/commit.txt \
-            packages/contracts/deployments/evidence/88882/MockSociosStaking.abi.json \
-            packages/contracts/deployments/evidence/88882/MockSociosStaking.flattened.sol \
-            packages/contracts/deployments/evidence/88882/MockFanToken.abi.json \
-            packages/contracts/deployments/evidence/88882/MockFanToken.flattened.sol
+          git add -- packages/contracts/deployments/88882.json
+          if [ "$DEPLOYMENT_TARGET" = predictions ]; then
+            git add -- \
+              packages/contracts/deployments/evidence/88882/ScoutReportPredictions.commit.txt \
+              packages/contracts/deployments/evidence/88882/ScoutReportPredictions.abi.json \
+              packages/contracts/deployments/evidence/88882/ScoutReportPredictions.flattened.sol
+          else
+            git add -- \
+              packages/contracts/deployments/evidence/88882/commit.txt \
+              packages/contracts/deployments/evidence/88882/MockSociosStaking.abi.json \
+              packages/contracts/deployments/evidence/88882/MockSociosStaking.flattened.sol \
+              packages/contracts/deployments/evidence/88882/MockFanToken.abi.json \
+              packages/contracts/deployments/evidence/88882/MockFanToken.flattened.sol
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "SR-16: record Spicy mock deployment and verification evidence" \
+          git commit -m "$ticket: record Spicy deployment and verification evidence" \
             -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
           gh auth setup-git
           git push origin "$branch"
           gh pr create --base "$DEFAULT_BRANCH" --head "$branch" \
-            --title "SR-16: record Spicy mock deployment" \
-            --body "Spicy chain 88882 only. Records confirmed mock addresses, deployment blocks, transaction hashes and source commit. ABI, flattened source and commit hash are committed as explorer-verification fallback evidence. Raw broadcast data and deployer secrets are excluded."
+            --title "$title" \
+            --body "Spicy chain 88882 only. Records confirmed addresses, deployment blocks, transaction hashes and per-contract source commits, preserving other deployments. ABI, flattened source and commit hash are committed as explorer-verification fallback evidence. Raw broadcast data and deployer secrets are excluded."

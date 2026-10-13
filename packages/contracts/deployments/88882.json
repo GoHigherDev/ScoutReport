@@ -5,7 +5,8 @@
   "contracts": {
     "MockSociosStaking": null,
     "MockFanToken18": null,
-    "MockFanToken6": null
+    "MockFanToken6": null,
+    "ScoutReportPredictions": null
   },
   "deploymentTransactionHashes": null
 }
