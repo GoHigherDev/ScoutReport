@@ -3,15 +3,20 @@ import {
   decodeFunctionData,
   decodeFunctionResult,
   encodeFunctionResult,
+  encodeAbiParameters,
+  encodeEventTopics,
   erc20Abi,
+  getAddress,
   multicall3Abi,
   type Abi,
   type Address,
   type Hex,
+  toHex,
 } from 'viem'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import stakingJson from '../abis/staking.json'
 import fixture from './fixtures/staking.json'
+import pendingFixture from './fixtures/pending-unstakes.json'
 import type { StakeDataResponse } from './staking.ts'
 
 const abi = stakingJson as Abi
@@ -50,13 +55,13 @@ const setup = async (
   stake = zeroStake,
   allTokens = false,
   failedRead?: string,
+  user = fixture.wallet as Address,
 ) => {
   const helpers = await import('./index.ts')
   const token = helpers.getTokenAddress(helpers.FAN_TOKENS[0], 88888)!
   const allowedTokens = (
     allTokens ? helpers.FAN_TOKENS : helpers.FAN_TOKENS.slice(0, 1)
   ).map((item) => helpers.getTokenAddress(item, 88888)!.toLowerCase())
-  const user = fixture.wallet as Address
   const calls: string[] = []
   const reply = (to: Address, data: Hex): Hex => {
     const proxy = to.toLowerCase() === helpers.STAKING_ADDRESS
@@ -201,12 +206,14 @@ describe('read-only Socios staking', () => {
       staked: 0n,
       unstaked: 0n,
       totalScoutRating: 0n,
+      pendingAmount: 0n,
       decimals: 18,
       formatted: {
         held: '0',
         staked: '0',
         unstaked: '0',
         totalScoutRating: '0',
+        pendingAmount: '0',
       },
     })
     expect(h.calls).toEqual(
@@ -460,12 +467,14 @@ describe('read-only Socios staking', () => {
         staked: '0',
         unstaked: '0',
         totalScoutRating: '0',
+        pendingAmount: '0',
         decimals: 18,
         formatted: {
           held: '0',
           staked: '0',
           unstaked: '0',
           totalScoutRating: '0',
+          pendingAmount: '0',
         },
         unstakePeriodSeconds: '604800',
       })
@@ -475,6 +484,252 @@ describe('read-only Socios staking', () => {
         server.close((error) => (error ? reject(error) : resolve())),
       )
     }
+  })
+})
+
+describe('pending unstake event reads (offline)', () => {
+  const sample = pendingFixture.samples[0]
+  const amount = BigInt(sample.amount) * 10n ** BigInt(pendingFixture.decimals)
+  const snapshot = 38378088n
+
+  async function pendingSetup(
+    selected = sample,
+    pendingAmount = BigInt(selected.amount) * 10n ** 18n,
+  ) {
+    const h = await setup(
+      pendingFixture.decimals,
+      0n,
+      { ...zeroStake, totalPendingUnstake: pendingAmount },
+      true,
+      undefined,
+      getAddress(selected.staker),
+    )
+    const token = h.getTokenAddress(
+      h.FAN_TOKENS.find((token) => token.key === 'AFC')!,
+      88888,
+    )!
+    return { ...h, token }
+  }
+
+  function log(
+    token: Address,
+    staker: Address,
+    eventName: 'Unstake' | 'Claim',
+    amount: bigint,
+    blockNumber: bigint,
+    releaseAt = BigInt(sample.claimableAt),
+    logIndex = 0n,
+  ) {
+    return {
+      address: '0x5ff7f9724fd477d9a07dcdb894d0ca7f8fae1501',
+      topics: encodeEventTopics({ abi, eventName, args: { staker, token } }),
+      data:
+        eventName === 'Unstake'
+          ? encodeAbiParameters(
+              [{ type: 'uint256' }, { type: 'uint256' }],
+              [amount, releaseAt],
+            )
+          : encodeAbiParameters([{ type: 'uint256' }], [amount]),
+      blockNumber: toHex(blockNumber),
+      logIndex: toHex(logIndex),
+      removed: false,
+    }
+  }
+
+  function mockLogs(logs: ReturnType<typeof log>[], fail = false) {
+    const ethCall = request.getMockImplementation()!
+    request.mockImplementation((rpc) => {
+      if (rpc.method !== 'eth_getLogs') return ethCall(rpc)
+      if (fail) throw new Error('Log read unavailable')
+      const filter = rpc.params[0]
+      return logs.filter(
+        (item) =>
+          BigInt(item.blockNumber) >= BigInt(filter.fromBlock) &&
+          BigInt(item.blockNumber) <= BigInt(filter.toBlock),
+      )
+    })
+  }
+
+  it.each(pendingFixture.samples)(
+    'reconciles the recorded $amount AFC pending-only sample',
+    async (selected) => {
+      const pendingAmount = BigInt(selected.amount) * 10n ** 18n
+      const h = await pendingSetup(selected)
+      mockLogs([
+        log(
+          h.token,
+          h.user,
+          'Unstake',
+          pendingAmount,
+          BigInt(selected.blockNumber),
+          BigInt(selected.claimableAt),
+        ),
+      ])
+      const [stake] = await h.readStakeDataLatestBatch(
+        h.client,
+        h.user,
+        [h.token],
+        { blockNumber: snapshot },
+      )
+      expect(stake).toMatchObject({
+        held: 0n,
+        staked: 0n,
+        pendingAmount,
+        totalScoutRating: 0n,
+      })
+      const [cooldown] = await h.readPendingUnstakesBatch(
+        h.client,
+        h.user,
+        [{ token: h.token, pendingAmount: stake.pendingAmount }],
+        snapshot,
+      )
+      expect(cooldown).toEqual({
+        pendingAmount,
+        releaseAt: BigInt(selected.claimableAt),
+        unstakePeriodSeconds: 604800n,
+        pendingOperationCount: 1,
+      })
+      const filters = request.mock.calls
+        .filter(([rpc]) => rpc.method === 'eth_getLogs')
+        .map(([rpc]) => rpc.params[0])
+      expect(filters).toHaveLength(2)
+      expect(BigInt(filters[0].fromBlock)).toBe(snapshot - 403200n)
+      expect(BigInt(filters[1].toBlock)).toBe(snapshot)
+      expect(BigInt(filters[1].fromBlock)).toBe(BigInt(filters[0].toBlock) + 1n)
+      for (const filter of filters) {
+        expect(
+          BigInt(filter.toBlock) - BigInt(filter.fromBlock) + 1n,
+        ).toBeLessThanOrEqual(250000n)
+        expect(filter.address).toBe(h.STAKING_ADDRESS)
+        expect(filter.topics).toEqual([
+          [
+            encodeEventTopics({ abi, eventName: 'Unstake' })[0],
+            encodeEventTopics({ abi, eventName: 'Claim' })[0],
+          ],
+          encodeEventTopics({
+            abi,
+            eventName: 'Unstake',
+            args: { staker: h.user },
+          })[1],
+          [
+            encodeEventTopics({
+              abi,
+              eventName: 'Unstake',
+              args: { token: h.token },
+            })[2],
+          ],
+        ])
+      }
+    },
+  )
+
+  it.each(['mismatch', 'failed logs', 'missing earlier unstake'] as const)(
+    'keeps pending amounts but no release for %s',
+    async (failure) => {
+      const h = await pendingSetup()
+      mockLogs(
+        [
+          log(
+            h.token,
+            h.user,
+            failure === 'missing earlier unstake' ? 'Claim' : 'Unstake',
+            amount - 1n,
+            snapshot,
+          ),
+        ],
+        failure === 'failed logs',
+      )
+      expect(
+        await h.readPendingUnstakesBatch(
+          h.client,
+          h.user,
+          [{ token: h.token, pendingAmount: amount }],
+          snapshot,
+        ),
+      ).toEqual([
+        {
+          pendingAmount: amount,
+          releaseAt: null,
+          unstakePeriodSeconds: 604800n,
+          pendingOperationCount: 0,
+        },
+      ])
+    },
+  )
+
+  it('subtracts claims, orders releases and counts remaining operations (synthetic)', async () => {
+    const h = await pendingSetup()
+    const early = BigInt(sample.claimableAt)
+    mockLogs([
+      log(h.token, h.user, 'Unstake', 100n, snapshot - 3n, early + 100n),
+      log(h.token, h.user, 'Unstake', 200n, snapshot - 2n, early),
+      log(h.token, h.user, 'Claim', 50n, snapshot - 1n),
+    ])
+    expect(
+      await h.readPendingUnstakesBatch(
+        h.client,
+        h.user,
+        [{ token: h.token, pendingAmount: 250n }],
+        snapshot,
+      ),
+    ).toEqual([
+      {
+        pendingAmount: 250n,
+        releaseAt: early,
+        unstakePeriodSeconds: 604800n,
+        pendingOperationCount: 2,
+      },
+    ])
+  })
+
+  it('does not request logs for zero pending and bounds a short chain to genesis', async () => {
+    const h = await pendingSetup()
+    mockLogs([])
+    await h.readPendingUnstakesBatch(
+      h.client,
+      h.user,
+      [{ token: h.token, pendingAmount: 0n }],
+      snapshot,
+    )
+    expect(request.mock.calls.every(([rpc]) => rpc.method === 'eth_call')).toBe(
+      true,
+    )
+    expect(
+      await h.readPendingUnstakesBatch(h.client, h.user, [], snapshot),
+    ).toEqual([])
+    request.mockClear()
+    await h.readPendingUnstakesBatch(
+      h.client,
+      h.user,
+      [{ token: h.token, pendingAmount: amount }],
+      123n,
+    )
+    const filters = request.mock.calls.filter(
+      ([rpc]) => rpc.method === 'eth_getLogs',
+    )
+    expect(filters).toHaveLength(1)
+    expect(filters[0][0].params[0]).toMatchObject({
+      fromBlock: '0x0',
+      toBlock: '0x7b',
+    })
+  })
+
+  it('keeps an event-derived release when the contract-wide default read fails', async () => {
+    const h = await pendingSetup()
+    mockLogs([log(h.token, h.user, 'Unstake', amount, snapshot)])
+    const reply = request.getMockImplementation()!
+    request.mockImplementation((rpc) => {
+      if (rpc.method === 'eth_call') throw new Error('Period unavailable')
+      return reply(rpc)
+    })
+    const [cooldown] = await h.readPendingUnstakesBatch(
+      h.client,
+      h.user,
+      [{ token: h.token, pendingAmount: amount }],
+      snapshot,
+    )
+    expect(cooldown.releaseAt).toBe(BigInt(sample.claimableAt))
+    expect(cooldown.unstakePeriodSeconds).toBeNull()
   })
 })
 import { execFile } from 'node:child_process'

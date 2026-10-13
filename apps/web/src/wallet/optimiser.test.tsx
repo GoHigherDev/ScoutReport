@@ -10,6 +10,7 @@ import { normaliseStake } from '@scoutreport/chain'
 import OptimiserPage from '../app/optimiser/page'
 import { NAMES } from '../copy/names'
 import type { PortfolioRow } from './hooks'
+import pendingFixture from '../../../../packages/chain/src/fixtures/pending-unstakes.json'
 
 const mocks = vi.hoisted(() => ({
   connection: {
@@ -52,6 +53,82 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('optimiser checklist', () => {
+  it.each([
+    [pendingFixture.samples[0].claimableAt, '19 Oct 2026, 14:52:12', '600'],
+    [pendingFixture.samples[1].claimableAt, '18 Oct 2026, 06:05:17', '300'],
+    // Synthetic winter release verifies GMT rather than a fixed BST offset.
+    ['1795003200', '18 Nov 2026, 12:00:00', '600'],
+  ])(
+    'shows pending %s in Europe/London without adding it to balances',
+    (releaseAt, expectedDate, amount) => {
+      mocks.portfolio.data = [
+        {
+          ...row('AFC', 0n, 0n),
+          ...normaliseStake(
+            0n,
+            0n,
+            pendingFixture.decimals,
+            BigInt(amount) * 10n ** BigInt(pendingFixture.decimals),
+          ),
+          releaseAt: BigInt(releaseAt),
+          unstakePeriodSeconds: 604800n,
+          pendingOperationCount: 1,
+        },
+      ]
+      render(<OptimiserPage />)
+      const chip = screen.getByText(
+        `Cooling down: ${amount} AFC · available from ${expectedDate} (UK time)`,
+      )
+      expect(chip).toHaveClass(
+        'bg-sr-secondary',
+        'border-sr-secondary',
+        'text-sr-text',
+      )
+      expect(chip).not.toHaveClass('text-sr-secondary')
+      expect(
+        screen.getByText(/Contract-wide default cooldown \(seconds\): 604800/),
+      ).toHaveTextContent('Per-token override unknown')
+      expect(
+        within(screen.getAllByRole('row')[1])
+          .getAllByRole('cell')
+          .map((cell) => cell.textContent),
+      ).toEqual(['0', '0', '0', '0', '—'])
+      expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    },
+  )
+
+  it('shows unavailable release, multiple-operation count and no chip for zero pending', () => {
+    const pending = {
+      ...row('PENDING', 0n, 0n),
+      ...normaliseStake(0n, 0n, 6, 1000000n),
+      releaseAt: null,
+      unstakePeriodSeconds: null,
+      pendingOperationCount: 0,
+    }
+    mocks.portfolio.data = [
+      row('ZERO', 1n, 0n),
+      pending,
+      {
+        ...pending,
+        key: 'MULTIPLE',
+        symbol: 'MULTIPLE',
+        releaseAt: 1792417932n,
+        pendingOperationCount: 2,
+      },
+    ]
+    render(<OptimiserPage />)
+    const rows = screen.getAllByRole('row')
+    expect(rows[1]).not.toHaveTextContent('Cooling down')
+    expect(rows[2]).toHaveTextContent(
+      'Cooling down: 1 PENDING · Release time unavailable',
+    )
+    expect(rows[2]).not.toHaveTextContent('available from')
+    expect(rows[3]).toHaveTextContent(
+      '2 pending unstakes; earliest release shown',
+    )
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
   it('uses the approved name, Mainnet badge and exact approved caveats', () => {
     render(<OptimiserPage />)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(

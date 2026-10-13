@@ -3,11 +3,14 @@
  * NOT earn Socios Reward Points. Only Socios Wallet staking earns RP.
  */
 import {
+  decodeEventLog,
+  encodeEventTopics,
   erc20Abi,
   isAddress,
   zeroAddress,
   type Abi,
   type Address,
+  type Hex,
   type PublicClient,
 } from 'viem'
 import stakingJson from '../abis/staking.json' with { type: 'json' }
@@ -33,12 +36,14 @@ export const normaliseStake = (
   held: bigint,
   staked: bigint,
   decimals: number,
+  pendingAmount = 0n,
 ) => {
   const amounts = {
     held,
     staked,
     unstaked: held,
     totalScoutRating: held + staked,
+    pendingAmount,
   }
   return {
     ...amounts,
@@ -48,6 +53,7 @@ export const normaliseStake = (
       staked: formatTokenAmount(amounts.staked, decimals),
       unstaked: formatTokenAmount(amounts.unstaked, decimals),
       totalScoutRating: formatTokenAmount(amounts.totalScoutRating, decimals),
+      pendingAmount: formatTokenAmount(pendingAmount, decimals),
     },
   }
 }
@@ -92,7 +98,12 @@ export const readStakeDataLatest = async (
     readTokenMeta(chiliz.id, token),
   ])
   const data = result as StakeDataResponse
-  return normaliseStake(held, data.totalStake, meta.decimals)
+  return normaliseStake(
+    held,
+    data.totalStake,
+    meta.decimals,
+    data.totalPendingUnstake,
+  )
 }
 
 /**
@@ -168,6 +179,7 @@ export async function readStakeDataLatestBatch(
       held.result as bigint,
       (stake.result as StakeDataResponse).totalStake,
       meta.value.decimals,
+      (stake.result as StakeDataResponse).totalPendingUnstake,
     )
     return options.allowFailure
       ? { status: 'success', meta: meta.value, ...normalised }
@@ -183,6 +195,7 @@ export async function readStakeDataLatestBatch(
 export const readUnstakePeriod = async (
   client: PublicClient,
   token: Address,
+  blockNumber?: bigint,
 ): Promise<bigint> => {
   validateRead(client, token)
   return (await client.readContract({
@@ -190,5 +203,146 @@ export const readUnstakePeriod = async (
     abi: stakingAbi,
     functionName: 'unstakePeriod',
     args: [],
+    blockNumber,
   })) as bigint
+}
+
+export type PendingUnstake = {
+  pendingAmount: bigint
+  releaseAt: bigint | null
+  unstakePeriodSeconds: bigint | null
+  pendingOperationCount: number
+}
+
+/**
+ * The maximum recorded cooldown is 1,209,600 seconds (~403,200 three-second
+ * blocks). Two non-overlapping reads stay within the public RPC's 250k cap.
+ * Incomplete history must never produce a guessed release deadline.
+ */
+export async function readPendingUnstakesBatch(
+  client: PublicClient,
+  user: Address,
+  tokens: readonly { token: Address; pendingAmount: bigint }[],
+  blockNumber: bigint,
+): Promise<PendingUnstake[]> {
+  if (!isAddress(user)) throw new Error(`Invalid wallet address: ${user}`)
+  tokens.forEach(({ token }) => validateRead(client, token))
+  if (tokens.length === 0) return []
+  const period = readUnstakePeriod(client, tokens[0].token, blockNumber).catch(
+    () => null,
+  )
+  const result: PendingUnstake[] = tokens.map(({ pendingAmount }) => ({
+    pendingAmount,
+    releaseAt: null,
+    unstakePeriodSeconds: null,
+    pendingOperationCount: 0,
+  }))
+  const pending = tokens.filter(({ pendingAmount }) => pendingAmount > 0n)
+  if (pending.length > 0) {
+    try {
+      const unstakeTopics = encodeEventTopics({
+        abi: stakingAbi,
+        eventName: 'Unstake',
+        args: { staker: user, token: pending.map(({ token }) => token) },
+      })
+      const claimTopics = encodeEventTopics({
+        abi: stakingAbi,
+        eventName: 'Claim',
+      })
+      const from = blockNumber > 403200n ? blockNumber - 403200n : 0n
+      const ranges = []
+      for (let start = from; start <= blockNumber; start += 250000n) {
+        ranges.push({
+          fromBlock: `0x${start.toString(16)}` as const,
+          toBlock: `0x${(start + 249999n < blockNumber
+            ? start + 249999n
+            : blockNumber
+          ).toString(16)}` as const,
+        })
+      }
+      const logs = (
+        await Promise.all(
+          ranges.map((range) =>
+            client.request({
+              method: 'eth_getLogs',
+              params: [
+                {
+                  address: STAKING_ADDRESS,
+                  topics: [
+                    [unstakeTopics[0] as Hex, claimTopics[0] as Hex],
+                    ...unstakeTopics.slice(1),
+                  ],
+                  ...range,
+                },
+              ],
+            }),
+          ),
+        )
+      ).flat()
+      logs.sort((a, b) => {
+        const difference = BigInt(a.blockNumber!) - BigInt(b.blockNumber!)
+        return difference === 0n
+          ? Number(BigInt(a.logIndex!) - BigInt(b.logIndex!))
+          : difference < 0n
+            ? -1
+            : 1
+      })
+      const operations = new Map<
+        string,
+        { amount: bigint; releaseAt: bigint }[]
+      >()
+      for (const log of logs) {
+        if (log.removed) throw new Error('Removed staking event.')
+        const decoded = decodeEventLog({
+          abi: stakingAbi,
+          data: log.data,
+          topics: log.topics,
+        })
+        const args = decoded.args as unknown as {
+          staker: Address
+          token: Address
+          amount: bigint
+          claimableAt?: bigint
+        }
+        if (args.staker.toLowerCase() !== user.toLowerCase()) continue
+        const key = args.token.toLowerCase()
+        const queue = operations.get(key) ?? []
+        if (decoded.eventName === 'Unstake') {
+          if (!args.claimableAt || args.claimableAt > 8640000000000n)
+            throw new Error('Invalid release time.')
+          queue.push({ amount: args.amount, releaseAt: args.claimableAt })
+          queue.sort((a, b) =>
+            a.releaseAt < b.releaseAt ? -1 : a.releaseAt > b.releaseAt ? 1 : 0,
+          )
+        } else if (decoded.eventName === 'Claim') {
+          let remaining = args.amount
+          while (remaining > 0n && queue.length > 0) {
+            const consumed =
+              remaining < queue[0].amount ? remaining : queue[0].amount
+            remaining -= consumed
+            queue[0].amount -= consumed
+            if (queue[0].amount === 0n) queue.shift()
+          }
+          if (remaining > 0n) throw new Error('Incomplete claim history.')
+        }
+        operations.set(key, queue)
+      }
+      tokens.forEach(({ token, pendingAmount }, index) => {
+        const queue = operations.get(token.toLowerCase()) ?? []
+        if (
+          pendingAmount > 0n &&
+          queue.length > 0 &&
+          queue.reduce((sum, operation) => sum + operation.amount, 0n) ===
+            pendingAmount
+        ) {
+          result[index].releaseAt = queue[0].releaseAt
+          result[index].pendingOperationCount = queue.length
+        }
+      })
+    } catch {
+      // Keep the tuple's amount even when the bounded history is unavailable.
+    }
+  }
+  const unstakePeriodSeconds = await period
+  return result.map((item) => ({ ...item, unstakePeriodSeconds }))
 }

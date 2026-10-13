@@ -1,0 +1,22 @@
+{
+  "provenance": "SR-30 AFC pending-only samples; claimableAt corrected from receipts on 13 October 2026 in SR-52 / GitHub issue #35. Amounts are AFC token units, not RP.",
+  "tokenKey": "AFC",
+  "decimals": 18,
+  "unstakePeriodSeconds": "604800",
+  "samples": [
+    {
+      "staker": "0xfea00bddbf1dd40300f9739b933c0070b004049d",
+      "amount": "600",
+      "blockNumber": "38347946",
+      "transactionHash": "0xfa486c86ec1b77bf06961d45a9fb1be4b514a560b7f4f0ce65030c6f05ca59e2",
+      "claimableAt": "1792417932"
+    },
+    {
+      "staker": "0xe57316b95c3b2f1daac76e907705469e30af57e9",
+      "amount": "300",
+      "blockNumber": "38308614",
+      "transactionHash": "0xd8fe210133c9bfadb98c257cc8763ed6cf864d0a81e53c3bde4b070db696c1cd",
+      "claimableAt": "1792299917"
+    }
+  ]
+}

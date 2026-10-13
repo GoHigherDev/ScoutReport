@@ -123,8 +123,20 @@ simulation is necessary because the existing `readStakeDataLatest` helper only
 returns normalised total stake/liquid holdings, not pending fields. All reads
 are pinned to the capture block, including both `perEventType` values.
 The earlier SR-30 pending-only AFC samples were 600/300 AFC with
-`claimableAt` 1792417420/1792296717; these are historical observations, not
+`claimableAt` 1792417932/1792299917 (receipt corrections recorded on 13 October
+2026 in SR-52); these are historical observations, not
 promised current balances. Non-zero matured claimable remains UNKNOWN.
+
+SR-52 displays pending-only rows without adding pending amounts to liquid or
+Scout Rating balances. Client-side public-RPC reads scan at most 403,201 blocks
+in two non-overlapping `eth_getLogs` chunks of at most 250,000 blocks, filtered
+by staking address, staker and pending tokens. Remaining Unstake amounts after
+Claim events must reconcile with the captured tuple before showing the earliest
+release and operation count in Europe/London. A failed or non-reconciling history
+shows “Release time unavailable”. The displayed period is explicitly the
+contract-wide default; per-token overrides remain unknown. No API route,
+subgraph change or write action is involved. Tests use offline SR-30 fixtures
+with the receipt-corrected timestamps above, plus synthetic failure and GMT cases. Non-zero matured claimable remains UNKNOWN.
 
 ## Polls: Survey3 interface and discovery
 

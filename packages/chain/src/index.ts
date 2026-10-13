@@ -20,6 +20,8 @@ export {
   readStakeDataLatest,
   readStakeDataLatestBatch,
   readUnstakePeriod,
+  readPendingUnstakesBatch,
+  type PendingUnstake,
   type NormalisedStake,
   type StakeBatchResult,
   type StakeDataResponse,
