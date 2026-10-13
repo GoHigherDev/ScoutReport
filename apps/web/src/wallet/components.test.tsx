@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   disconnectAsync: vi.fn(),
   ensureChain: vi.fn(),
   client: { request: vi.fn() },
+  connectorClient: vi.fn(),
   holdings: {
     isPending: false,
     isError: false,
@@ -38,7 +39,7 @@ vi.mock('wagmi', () => ({
     disconnectAsync: mocks.disconnectAsync,
     isPending: false,
   }),
-  useConnectorClient: () => ({ data: mocks.client }),
+  useConnectorClient: mocks.connectorClient,
 }))
 vi.mock('./providers', () => ({ useWalletModal: () => mocks.modal }))
 vi.mock('./hooks', () => ({ useHoldings: () => mocks.holdings }))
@@ -56,6 +57,10 @@ beforeEach(() => {
   mocks.holdings.isPending = false
   mocks.holdings.isError = false
   mocks.holdings.data = []
+  mocks.connectorClient.mockImplementation((options: { chainId?: number }) => ({
+    data:
+      options.chainId === mocks.connection.chainId ? mocks.client : undefined,
+  }))
 })
 
 afterEach(() => {
@@ -119,6 +124,10 @@ describe('wallet controls', () => {
         new ChainSwitchRejectedError(new Error('Rejected')),
       )
       render(<WrongNetworkBanner />)
+      expect(mocks.connectorClient).toHaveBeenCalledWith({ chainId })
+      expect(
+        screen.getByRole('button', { name: NAMES.wallet.switchSpicy }),
+      ).toBeEnabled()
       fireEvent.click(
         screen.getByRole('button', { name: NAMES.wallet.switchSpicy }),
       )

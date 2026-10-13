@@ -86,7 +86,7 @@ export function WalletButton() {
 export function WrongNetworkBanner() {
   const { chainId, isConnected } = useConnection()
   // Connector client remains available even when the current chain is unsupported.
-  const { data: client } = useConnectorClient()
+  const { data: client } = useConnectorClient({ chainId })
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string>()
   const appChain = getAppChain()
