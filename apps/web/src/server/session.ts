@@ -1,11 +1,11 @@
 import 'server-only'
 import { getIronSession, type SessionOptions } from 'iron-session'
 import { z } from 'zod'
-import { addressSchema } from './address'
+import { addressSchema, toStoredAddress } from './address'
 
 export const SESSION_TTL = 7 * 24 * 60 * 60
 const verifiedSessionSchema = z.object({
-  address: addressSchema,
+  address: addressSchema.transform(toStoredAddress),
   chainId: z.union([z.literal(88888), z.literal(88882)]),
   isContract: z.boolean(),
   issuedAt: z.number().int().nonnegative(),

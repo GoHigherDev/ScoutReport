@@ -5,7 +5,7 @@ import { isErc6492Signature } from 'viem'
 import { parseSiweMessage, validateSiweMessage } from 'viem/siwe'
 import { z } from 'zod'
 import { SIWE_STATEMENT } from '../copy/auth'
-import { toChecksumAddress } from './address'
+import { toStoredAddress } from './address'
 import { handler, HttpError, type RateLimiter } from './http'
 import { getVerifiedSession, readSession } from './session'
 import { nonceStore } from './siwe-nonces'
@@ -118,7 +118,7 @@ export const createAuthRoutes = (options: AuthOptions = {}) => {
         ) {
           throw invalid()
         }
-        const address = toChecksumAddress(parsed.address) as `0x${string}`
+        const address = toStoredAddress(parsed.address) as `0x${string}`
         const client = getPublicClient(parsed.chainId!)
         const code = await client.getCode({ address })
         const isContract =

@@ -1,32 +1,24 @@
 // @vitest-environment node
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { createServer } from 'node:net'
-import { fileURLToPath } from 'node:url'
 import {
   createPublicClient,
-  createWalletClient,
-  defineChain,
-  http,
+  custom,
+  decodeAbiParameters,
+  erc6492SignatureValidatorByteCode,
+  hashMessage,
+  parseErc6492Signature,
+  recoverAddress,
   serializeErc6492Signature,
   zeroAddress,
   type Address,
+  type Hex,
 } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { createSiweMessage } from 'viem/siwe'
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SIWE_STATEMENT } from '../copy/auth'
 import { requireAdmin } from './admin'
+import { toStoredAddress } from './address'
 import { createAuthRoutes } from './auth'
 import { getVerifiedSession, readSession, SESSION_TTL } from './session'
 
@@ -41,9 +33,50 @@ vi.mock('@scoutreport/chain', () => ({ getPublicClient }))
 const origin = 'https://localhost'
 const owner = privateKeyToAccount(generatePrivateKey())
 const other = privateKeyToAccount(generatePrivateKey())
-let anvil: ChildProcess
-let contractAddress: Address
-let client: ReturnType<typeof createPublicClient>
+const contractAddress: Address = '0x00000000000000000000000000000000000000ab'
+const isValidSignature = vi.fn(async (hash: Hex, signature: Hex) => {
+  try {
+    const signer = await recoverAddress({ hash, signature })
+    return signer === owner.address ? '0x1626ba7e' : '0xffffffff'
+  } catch {
+    return '0xffffffff'
+  }
+})
+const rpc = vi.fn(
+  async ({
+    method,
+    params,
+  }: {
+    method: string
+    params?: readonly unknown[]
+  }) => {
+    if (method === 'eth_getCode') {
+      return String(params?.[0]).toLowerCase() === contractAddress
+        ? '0x6000'
+        : '0x'
+    }
+    if (method === 'eth_call') {
+      const { data, to } = params![0] as { data: Hex; to?: Address }
+      if (to || !data.startsWith(erc6492SignatureValidatorByteCode)) {
+        throw new Error('Unexpected signature verification call')
+      }
+      const [address, hash, signature] = decodeAbiParameters(
+        [{ type: 'address' }, { type: 'bytes32' }, { type: 'bytes' }],
+        `0x${data.slice(erc6492SignatureValidatorByteCode.length)}`,
+      )
+      if (address.toLowerCase() !== contractAddress) return '0x00'
+      const result = await isValidSignature(
+        hash,
+        parseErc6492Signature(signature).signature,
+      )
+      return result === '0x1626ba7e' ? '0x01' : '0x00'
+    }
+    throw new Error(`Unexpected RPC method: ${method}`)
+  },
+)
+const client = createPublicClient({
+  transport: custom({ request: rpc }, { retryCount: 0 }),
+})
 let verify: ReturnType<typeof vi.spyOn>
 let getCode: ReturnType<typeof vi.spyOn>
 let routes: ReturnType<typeof createAuthRoutes>
@@ -70,65 +103,6 @@ const request = (
 const cookieFrom = (response: Response) =>
   response.headers.get('Set-Cookie')!.split(';')[0]!
 
-beforeAll(async () => {
-  const contractsDir = fileURLToPath(
-    new URL('../../../../packages/contracts/', import.meta.url),
-  )
-  execFileSync('forge', ['build'], { cwd: contractsDir, stdio: 'pipe' })
-  const artifact = JSON.parse(
-    readFileSync(
-      `${contractsDir}/out/MockERC1271.sol/MockERC1271.json`,
-      'utf8',
-    ),
-  )
-  const server = createServer()
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const port = (server.address() as { port: number }).port
-  await new Promise<void>((resolve, reject) =>
-    server.close((error) => (error ? reject(error) : resolve())),
-  )
-  anvil = spawn(
-    'anvil',
-    [
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(port),
-      '--chain-id',
-      '88888',
-      '--silent',
-    ],
-    {
-      stdio: 'ignore',
-    },
-  )
-  const chain = defineChain({
-    id: 88888,
-    name: 'Local SIWE test',
-    nativeCurrency: { name: 'Test', symbol: 'TEST', decimals: 18 },
-    rpcUrls: { default: { http: [`http://127.0.0.1:${port}`] } },
-  })
-  client = createPublicClient({
-    chain,
-    transport: http(chain.rpcUrls.default.http[0], { retryCount: 0 }),
-  })
-  await vi.waitFor(() => client.getChainId(), { timeout: 5000 })
-  const wallet = createWalletClient({
-    chain,
-    transport: http(chain.rpcUrls.default.http[0]),
-  })
-  const [deployer] = await wallet.getAddresses()
-  const hash = await wallet.deployContract({
-    account: deployer!,
-    abi: artifact.abi,
-    bytecode: artifact.bytecode.object,
-    args: [owner.address],
-  })
-  const receipt = await client.waitForTransactionReceipt({ hash })
-  contractAddress = receipt.contractAddress!
-}, 60_000)
-
-afterAll(() => anvil?.kill())
 beforeEach(() => {
   vi.stubEnv('SESSION_SECRET', randomBytes(32).toString('hex'))
   vi.stubEnv('NEXT_PUBLIC_SITE_URL', origin)
@@ -187,7 +161,7 @@ async function sign(
   return JSON.stringify({ message: data.message, signature })
 }
 
-describe('SIWE auth routes with local signature verification', () => {
+describe('SIWE auth routes with mocked RPC and real signature recovery', () => {
   it('issues random, browser-bound nonces with a ten-minute expiry', async () => {
     const first = await challenge()
     const second = await challenge()
@@ -221,7 +195,7 @@ describe('SIWE auth routes with local signature verification', () => {
       const sessionRequest = request('me', undefined, cookieFrom(response))
       const session = await getVerifiedSession(sessionRequest)
       expect(session).toEqual({
-        address: owner.address,
+        address: toStoredAddress(owner.address),
         chainId,
         isContract: false,
         issuedAt: expect.any(Number),
@@ -231,6 +205,10 @@ describe('SIWE auth routes with local signature verification', () => {
       expect(await (await routes.me(sessionRequest)).json()).toEqual({
         session,
       })
+      expect(await response.json()).toEqual(session)
+      expect((await readSession(sessionRequest, new Response())).address).toBe(
+        toStoredAddress(owner.address),
+      )
       const logout = await routes.logout(
         request('logout', '{}', cookieFrom(response)),
       )
@@ -265,12 +243,26 @@ describe('SIWE auth routes with local signature verification', () => {
       )
       expect(response.status).toBe(200)
       expect(await response.json()).toMatchObject({
-        address: contractAddress,
+        address: toStoredAddress(contractAddress),
         chainId: 88888,
         isContract: true,
       })
       expect(getCode).toHaveBeenCalledWith({ address: contractAddress })
       expect(getPublicClient).toHaveBeenCalledWith(88888)
+      expect(isValidSignature).toHaveBeenCalledWith(
+        hashMessage(data.message),
+        signature,
+      )
+      const sessionRequest = request('me', undefined, cookieFrom(response))
+      expect((await readSession(sessionRequest, new Response())).address).toBe(
+        toStoredAddress(contractAddress),
+      )
+      expect(await (await routes.me(sessionRequest)).json()).toMatchObject({
+        session: {
+          address: toStoredAddress(contractAddress),
+          isContract: true,
+        },
+      })
     },
   )
 
@@ -498,5 +490,24 @@ describe('SIWE auth routes with local signature verification', () => {
         ),
       ).toBeNull()
     }
+  })
+
+  it('normalises an existing checksummed session at the verified boundary', async () => {
+    const response = new Response()
+    const session = await readSession(request('me'), response)
+    Object.assign(session, {
+      address: owner.address,
+      chainId: 88888,
+      isContract: false,
+      issuedAt: Date.now(),
+    })
+    await session.save()
+    const sessionRequest = request('me', undefined, cookieFrom(response))
+    expect(await getVerifiedSession(sessionRequest)).toMatchObject({
+      address: toStoredAddress(owner.address),
+    })
+    expect(await (await routes.me(sessionRequest)).json()).toMatchObject({
+      session: { address: toStoredAddress(owner.address) },
+    })
   })
 })

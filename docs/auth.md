@@ -60,6 +60,8 @@ trusted localhost environment or local HTTPS. Every auth response is `no-store`.
 5. The encrypted iron-session cookie stores `{ address, chainId, isContract,
 issuedAt }` (issued-at is Unix milliseconds). It is httpOnly, Secure,
    SameSite=Lax, host-only, path `/`, with a seven-day expiry.
+   Session and auth JSON addresses use the lowercase `toStoredAddress` form;
+   checksum formatting belongs only at display edges.
    `isContract` records code presence or a counterfactual signature wrapper;
    it does not identify Socios Wallet or establish Reward Point eligibility.
 6. `GET /api/auth/me` returns `{ session }`, with `null` when unauthenticated.
@@ -90,8 +92,16 @@ stolen copy before expiry. No profile or admin pages are added.
 Run `pnpm turbo run lint typecheck test` with Foundry installed, as in CI.
 Focused tests are in `apps/web/src/server/auth.test.ts`,
 `apps/web/src/server/http.test.ts` and
-`apps/web/src/wallet/sign-in.test.ts`. The auth tests compile the test utility
-with Forge, start a loopback-only Anvil node and deploy
-`packages/contracts/test/utils/MockERC1271.sol`. Nonce storage is mocked; signing
-keys are generated in memory for each test run. No hosted DB, live chain RPC,
-real secrets or committed private keys are needed.
+`apps/web/src/wallet/sign-in.test.ts`. Web auth tests are self-contained: they
+use a viem public client with a mocked RPC transport and nonce storage. EOA
+signatures use real recovery; the mocked ERC-1271 owner check returns the magic
+value only for valid owner signatures, including ERC-6492 wrappers. Signing
+keys and the throwaway session secret are generated in memory per test run.
+No hosted DB, live RPC, Anvil, Forge or compiler download is needed for
+`pnpm --filter @scoutreport/web test`.
+
+`packages/contracts/test/utils/MockERC1271.sol` and its Foundry tests remain
+validated by the GitHub `contracts` CI job. That job passed on head `87215bf`;
+local Solidity compiler download access is not a prerequisite for web auth
+validation. Full workspace validation still includes Foundry, as configured
+in CI.
