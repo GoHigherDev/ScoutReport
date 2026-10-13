@@ -38,7 +38,7 @@ and CI caching/timing. GitHub Actions validates pull requests and pushes to
 | `pnpm dev`                                  | Run the Next.js web app                             |
 | `pnpm turbo run build`                      | Build all packages and apps                         |
 | `pnpm turbo run lint typecheck test build`  | Lint, typecheck, test, and build workspace projects |
-| `pnpm --filter @scoutreport/contracts test` | Run the Foundry placeholder test                    |
+| `pnpm --filter @scoutreport/contracts test` | Run Foundry scaffold and staking mock tests          |
 | `pnpm format`                               | Format workspace files with Prettier                |
 | `pnpm format:check`                         | Check formatting                                    |
 
@@ -143,6 +143,13 @@ The sandbox could not resolve any of these RPC hosts on 13 October 2026, so a
 live wallet read remains to be run with RPC access. Unit tests use the approved
 zero-stake reference and recorded period from issue #17 / PR #18, plus explicitly
 synthetic arithmetic cases; they do not claim a block-pinned Mainnet capture.
+
+See the [SR-30 staking spike](docs/research/chat-staking-spike.md) for the exact
+tuple interface, evidence limitations, Spicy mock strategy, read-only
+verification commands and C-02–C-11 / R-01 hand-offs. Mock deployment is pending
+F-11 and an authorised key holder; `deployments/88882.json` contains null
+placeholders, not deployed addresses. The existing Mainnet reader remains
+unchanged and does not silently fall back to mocks.
 
 ## Repository map
 

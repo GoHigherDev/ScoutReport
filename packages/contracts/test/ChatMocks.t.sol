@@ -103,9 +103,9 @@ contract ChatMocksTest {
         token.mint(address(this), 10);
         require(token.transfer(address(this), 10));
         require(token.balanceOf(address(this)) == 10);
-        token.approve(OTHER, type(uint256).max);
+        require(token.approve(OTHER, type(uint256).max));
         vm.prank(OTHER);
-        token.transferFrom(address(this), STAKER, 10);
+        require(token.transferFrom(address(this), STAKER, 10));
         require(token.allowance(address(this), OTHER) == type(uint256).max);
     }
 
@@ -119,7 +119,7 @@ contract ChatMocksTest {
         vm.prank(OTHER);
         (bool noAllowance,) = address(token).call(abi.encodeCall(token.transferFrom, (address(this), STAKER, 1)));
         require(!noAllowance);
-        token.approve(OTHER, 11);
+        require(token.approve(OTHER, 11));
         vm.prank(OTHER);
         (bool excessApprovedBalance,) =
             address(token).call(abi.encodeCall(token.transferFrom, (address(this), STAKER, 11)));
