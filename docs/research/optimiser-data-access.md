@@ -409,3 +409,22 @@ Local tests validate exact ABI content, chain fail-closed behaviour, hash
 matching, raw pending amounts, on-chain decimals, block pinning, redacted
 failures and exclusively read-only RPC methods. CI tests need no network.
 No workflow or four required-check configuration is changed.
+
+### Local validation, 13 October 2026
+
+- `pnpm --filter @scoutreport/chain test`: **140 tests passed**, including five
+  new offline spike tests; chain lint/typecheck also passed.
+- `pnpm turbo run lint typecheck test build`: **18 tasks successful**.
+  Initial attempts were blocked downloading solc/Matchstick; installing the
+  same official pinned tools locally resolved this without repository changes.
+- `forge fmt --check`, `forge build`, `forge test -vvv`: passed, **11 Solidity
+  tests passed**.
+- Changed-file secret scan: no secrets. CodeQL JavaScript scan: **zero alerts**.
+  Separate read-only code review: no significant issues (the bundled review
+  executable was unavailable).
+- [PR CI run 38417673675](https://github.com/GoHigherDev/ScoutReport/actions/runs/38417673675):
+  `action_required`, awaiting GitHub approval when checked; no jobs ran.
+  Local success is not a claim that all four remote checks have run.
+
+Outstanding acceptance gates: maintainer live capture, actual downstream Jira
+scopes and Brave's approval of caveat copy. No live read or approval is invented.

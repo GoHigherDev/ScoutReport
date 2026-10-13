@@ -139,7 +139,7 @@ and CI caching/timing. GitHub Actions validates pull requests and pushes to
 | `pnpm dev`                                  | Run the Next.js web app                             |
 | `pnpm turbo run build`                      | Build all packages and apps                         |
 | `pnpm turbo run lint typecheck test build`  | Lint, typecheck, test, and build workspace projects |
-| `pnpm --filter @scoutreport/contracts test` | Run Foundry scaffold and staking mock tests         |
+| `pnpm --filter @scoutreport/contracts test` | Run Foundry scaffold and staking mock tests          |
 | `pnpm format`                               | Format workspace files with Prettier                |
 | `pnpm format:check`                         | Check formatting                                    |
 
