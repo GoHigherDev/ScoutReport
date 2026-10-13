@@ -1,0 +1,16 @@
+{
+  "provenance": "Zero-stake reference approved in PR #18 comment 6140397988, 13 October 2026; unstakePeriod recorded externally as 604800 seconds. No block-pinned RPC capture is claimed.",
+  "wallet": "0x0000000000000000000000000000000000000000",
+  "tokenKey": "NAVI",
+  "stakeDataLatest": {
+    "totalStake": "0",
+    "totalUnstakable": "0",
+    "totalLocked": "0",
+    "totalLockedFlexible": "0",
+    "totalClaimable": "0",
+    "totalPendingUnstake": "0",
+    "totalExemptFromCooldownPeriod": "0",
+    "totalLockedPerEventType": []
+  },
+  "unstakePeriodSeconds": "604800"
+}

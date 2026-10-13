@@ -92,6 +92,58 @@ invalid addresses, failed reads, symbol or decimals mismatches. Spicy reports
 these tokens as unavailable without making RPC calls. Live verification is
 separate from the deterministic mocked-transport unit tests and CI builds.
 
+### Read-only Socios staking
+
+ScoutReport is a third-party dapp, not affiliated with Socios. External-wallet
+staking can contribute to staking and Scout Rating but does **not** earn Socios
+Reward Points; only Socios Wallet staking earns RP. No Partner API or RP
+calculations are used.
+
+`readStakeDataLatest(client, user, token)` calls the Mainnet proxy
+`0x5ff7f9724fd477d9a07dcdb894d0ca7f8fae1501` with the verified Staking3
+implementation ABI in `packages/chain/abis/staking.json`.
+That file is the complete 76-entry ABI supplied in [issue #17](https://github.com/GoHigherDev/ScoutReport/issues/17),
+retrieved by the Delivery Manager on **13 October 2026** from the
+[Routescan verified-source API](https://api.routescan.io/v2/network/mainnet/evm/88888/etherscan/api?module=contract&action=getsourcecode&address=0xed9331b504cd498ec04613d621a92c8e28bb8417)
+and [Chiliscan implementation page](https://chiliscan.com/address/0xed9331b504cd498ec04613d621a92c8e28bb8417).
+The ERC-1967 UUPS proxy's implementation was verified externally as
+`0xed9331b504cd498ec04613d621a92c8e28bb8417` (`Staking3`, solc v0.8.23).
+Explorer DNS prevented an independent sandbox re-fetch; the supplied ABI is
+preserved, including original names. An implementation upgrade requires
+re-verification.
+It uses **`simulateContract` / `eth_call`**, never a transaction: the nonpayable
+`getStakeDataLatest(staker, token, false)` refreshes accounting in simulation,
+whereas the view `getStakeData` does not run that latest accounting logic.
+The returned single tuple's `totalStake` is used as `staked`; locked and pending
+fields are not added again. There are no stake, unstake, claim or other write
+wrappers, even though the complete source ABI includes write functions.
+
+The helper reads `balanceOf` as `held`, reuses `readTokenMeta` for on-chain
+`decimals()`, and returns `normaliseStake(held, staked, decimals)`:
+`{ held, staked, unstaked: held, totalScoutRating: held + staked, decimals, formatted }`.
+Amounts are bigint; formatted strings are exact, en-GB and bigint-safe.
+**`unstaked` means the liquid wallet balance**, not pending unstake.
+`readUnstakePeriod(client, token)` returns bigint seconds from the no-argument
+`unstakePeriod()` getter. The token is validated but not passed on-chain:
+the returned period is contract-wide and does not expose token-specific
+overrides. Period seconds are not scaled by token decimals.
+
+```sh
+pnpm --filter @scoutreport/chain read-stake <public-wallet-address> NAVI
+```
+
+Use a known public wallet with NAVI or AFC from `FAN_TOKENS`. The CLI prints
+normalised DATA_CHAIN output to stdout (bigint as decimal strings), stores
+no wallet data or keys, and exits non-zero on invalid input or failed reads.
+It rejects Spicy rather than sending Mainnet staking calls to an unverified
+testnet address. Set `RPC_URL_MAINNET` to `https://rpc.ankr.com/chiliz`,
+`https://rpc.chiliz.com` or `https://chiliz-rpc.publicnode.com`; the existing
+`RPC_URL_MAINNET_FALLBACK` is also supported.
+The sandbox could not resolve any of these RPC hosts on 13 October 2026, so a
+live wallet read remains to be run with RPC access. Unit tests use the approved
+zero-stake reference and recorded period from issue #17 / PR #18, plus explicitly
+synthetic arithmetic cases; they do not claim a block-pinned Mainnet capture.
+
 ## Repository map
 
 | Path                 | Purpose                                               |

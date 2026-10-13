@@ -8,6 +8,14 @@ export {
   isSupportedChainId,
 } from './networks.ts'
 export { getPublicClient } from './clients.ts'
+export {
+  STAKING_ADDRESS,
+  normaliseStake,
+  readStakeDataLatest,
+  readUnstakePeriod,
+  type NormalisedStake,
+  type StakeDataResponse,
+} from './staking.ts'
 export { ChainSwitchRejectedError, ensureChain } from './switch.ts'
 export {
   FAN_TOKENS,

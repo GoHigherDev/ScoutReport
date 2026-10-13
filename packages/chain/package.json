@@ -3,12 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
     }
   },
   "scripts": {
@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "verify-tokens": "node --experimental-strip-types scripts/verify-tokens.ts"
+    "verify-tokens": "node --experimental-strip-types scripts/verify-tokens.ts",
+    "read-stake": "node --experimental-strip-types scripts/read-stake.ts"
   },
   "dependencies": {
     "viem": "2.57.3"
