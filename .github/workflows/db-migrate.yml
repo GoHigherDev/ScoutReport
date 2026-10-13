@@ -1,0 +1,49 @@
+name: Migrate preview/staging database
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Database environment (run before app rollout)
+        type: choice
+        options: [preview, staging]
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-migrate-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.ref == 'refs/heads/main'
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Validate environment
+        env:
+          TARGET: ${{ inputs.environment }}
+        run: |
+          case "$TARGET" in preview|staging) ;; *) exit 1 ;; esac
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply committed migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          test -n "$DATABASE_URL" || { echo "DATABASE_URL is required"; exit 1; }
+          echo "::add-mask::$DATABASE_URL"
+          pnpm db:migrate > "$RUNNER_TEMP/migrate.log" 2>&1 || {
+            echo "Migration failed; inspect the database privately. No app rollout permitted."
+            exit 1
+          }

@@ -1,0 +1,106 @@
+name: Deploy Spicy contracts
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: Deployment network (Spicy only)
+        type: choice
+        required: true
+        default: spicy
+        options:
+          - spicy
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-contracts-spicy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: spicy
+    permissions:
+      contents: write
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: packages/contracts
+    env:
+      RPC_URL: https://spicy-rpc.chiliz.com/
+    steps:
+      - name: Refuse non-Spicy requests
+        working-directory: .
+        env:
+          REQUESTED_NETWORK: ${{ inputs.network }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] || [ "$REQUESTED_NETWORK" != spicy ]; then
+            echo "::error::Only an explicit Spicy workflow dispatch is permitted."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: v1.8.5
+      - name: Validate mocks and Spicy RPC
+        run: |
+          node --test scripts/*.test.mjs
+          forge fmt --check
+          forge build
+          forge test
+          if [ "$(cast chain-id --rpc-url "$RPC_URL")" != 88882 ]; then
+            echo "::error::RPC must report Spicy chain 88882."
+            exit 1
+          fi
+      - name: Broadcast Spicy mocks
+        env:
+          SPICY_DEPLOYER_PRIVATE_KEY: ${{ secrets.SPICY_DEPLOYER_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPICY_DEPLOYER_PRIVATE_KEY" ]; then
+            echo "::error::The spicy environment deployer secret is required."
+            exit 1
+          fi
+          echo "::add-mask::$SPICY_DEPLOYER_PRIVATE_KEY"
+          mkdir -p broadcast
+          # Keep raw output and broadcast data ignored; never print or upload it.
+          if ! forge script script/DeployChatMocks.s.sol:DeployChatMocks \
+            --rpc-url "$RPC_URL" --chain 88882 --broadcast --slow \
+            > broadcast/workflow.log 2>&1; then
+            echo "::error::Spicy broadcast failed; no raw transaction data is published."
+            exit 1
+          fi
+      - name: Commit sanitised record and verification evidence, then open PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          node scripts/record-deployment.mjs \
+            broadcast/DeployChatMocks.s.sol/88882/run-latest.json "$GITHUB_SHA"
+          cd ../..
+          branch="SR-16/spicy-deployment-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git switch -c "$branch"
+          git add -- \
+            packages/contracts/deployments/88882.json \
+            packages/contracts/deployments/evidence/88882/commit.txt \
+            packages/contracts/deployments/evidence/88882/MockSociosStaking.abi.json \
+            packages/contracts/deployments/evidence/88882/MockSociosStaking.flattened.sol \
+            packages/contracts/deployments/evidence/88882/MockFanToken.abi.json \
+            packages/contracts/deployments/evidence/88882/MockFanToken.flattened.sol
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "SR-16: record Spicy mock deployment and verification evidence" \
+            -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+          gh auth setup-git
+          git push origin "$branch"
+          gh pr create --base "$DEFAULT_BRANCH" --head "$branch" \
+            --title "SR-16: record Spicy mock deployment" \
+            --body "Spicy chain 88882 only. Records confirmed mock addresses, deployment blocks, transaction hashes and source commit. ABI, flattened source and commit hash are committed as explorer-verification fallback evidence. Raw broadcast data and deployer secrets are excluded."

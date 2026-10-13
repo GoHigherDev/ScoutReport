@@ -9,6 +9,12 @@ export {
 } from './networks.ts'
 export { getPublicClient } from './clients.ts'
 export {
+  DEPLOYMENT_ADDRESSES,
+  readDeploymentAddresses,
+  type DeploymentAddresses,
+  type MockContractName,
+} from './deployments.ts'
+export {
   STAKING_ADDRESS,
   normaliseStake,
   readStakeDataLatest,

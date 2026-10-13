@@ -6,6 +6,11 @@ top of Socios.com Fan Tokens. It is not affiliated with Socios.
 For NAVI/AFC indexing, deployment commands and GraphQL examples, see the
 [Scout Rating subgraph guide](packages/subgraph/README.md).
 
+For Spicy preview/staging on Vercel and the read-only Mainnet indexer, see the
+[environment matrix](docs/environments.md) and
+[deployment runbook](docs/runbooks/deploy.md). Preview/staging must retain Vercel
+Authentication until SR-63; production/Mainnet rollout is deferred to SR-64.
+
 ## Prerequisites
 
 - Node.js LTS (22 or newer; Node 24 is selected in `.nvmrc`)
@@ -244,7 +249,7 @@ See the [SR-30 staking spike](docs/research/chat-staking-spike.md) for the exact
 tuple interface, evidence limitations, Spicy mock strategy, read-only
 verification commands and C-02–C-11 / R-01 hand-offs. Revised SR-30 AC4 is met
 by the mock scaffold; actual deployment is deferred to F-11 and an authorised
-key holder. `deployments/88882.json` contains null
+key holder. `packages/contracts/deployments/88882.json` contains null
 placeholders, not deployed addresses. The existing Mainnet reader remains
 unchanged and does not silently fall back to mocks.
 
