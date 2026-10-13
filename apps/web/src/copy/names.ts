@@ -30,6 +30,23 @@ export const NAMES = {
     pendingUnstakes: 'pending unstakes; earliest release shown',
     defaultUnstakePeriod: 'Contract-wide default cooldown (seconds)',
     tokenPeriodUnknown: 'Per-token override unknown',
+    earnRoutes: {
+      heading: 'Socios Reward Point routes',
+      description:
+        'Source-confirmed routes are not confirmation of your eligibility or points received. Other activities remain unconfirmed as RP routes.',
+      confirmed: 'Source-confirmed',
+      unconfirmed: 'Unconfirmed',
+      researchLink: 'R-01 research, route evidence and limitations',
+      staking: {
+        name: 'Fan Token staking via the Socios app',
+        howTo:
+          'In the Socios.com app (Socios Wallet), review Fan Token staking and the app’s eligibility requirements.',
+      },
+      fanZone: { name: 'Fan Zone tasks' },
+      polls: { name: 'Polls' },
+      quizzes: { name: 'Quizzes' },
+      checkIns: { name: 'Check-ins' },
+    },
     rpCaveat: {
       externalWalletCaveat,
       sociosWalletLine:
@@ -106,3 +123,58 @@ export const OPTIMISER_SOURCE_LINKS = [
     href: 'https://helpcenter.socios.com/en/articles/472529-do-i-need-fan-tokens-to-vote',
   },
 ] as const
+
+type OptimiserEarnRoute = {
+  id: 'staking' | 'fanZone' | 'polls' | 'quizzes' | 'checkIns'
+  name: string
+  source: { label: string; href: string }
+} & (
+  | { status: 'confirmed'; howTo: string }
+  | { status: 'unconfirmed'; howTo?: never }
+)
+
+export const OPTIMISER_EARN_ROUTES: readonly OptimiserEarnRoute[] = [
+  {
+    id: 'staking',
+    name: NAMES.optimiserCopy.earnRoutes.staking.name,
+    status: 'confirmed',
+    howTo: NAMES.optimiserCopy.earnRoutes.staking.howTo,
+    source: OPTIMISER_SOURCE_LINKS[0],
+  },
+  {
+    id: 'fanZone',
+    name: NAMES.optimiserCopy.earnRoutes.fanZone.name,
+    status: 'unconfirmed',
+    source: {
+      label: NAMES.optimiserCopy.earnRoutes.researchLink,
+      href: 'https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md',
+    },
+  },
+  {
+    id: 'polls',
+    name: NAMES.optimiserCopy.earnRoutes.polls.name,
+    status: 'unconfirmed',
+    source: {
+      label: NAMES.optimiserCopy.earnRoutes.researchLink,
+      href: 'https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md#rp-and-other-app-side-data',
+    },
+  },
+  {
+    id: 'quizzes',
+    name: NAMES.optimiserCopy.earnRoutes.quizzes.name,
+    status: 'unconfirmed',
+    source: {
+      label: NAMES.optimiserCopy.earnRoutes.researchLink,
+      href: 'https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md#rp-and-other-app-side-data',
+    },
+  },
+  {
+    id: 'checkIns',
+    name: NAMES.optimiserCopy.earnRoutes.checkIns.name,
+    status: 'unconfirmed',
+    source: {
+      label: NAMES.optimiserCopy.earnRoutes.researchLink,
+      href: 'https://github.com/GoHigherDev/ScoutReport/blob/main/docs/research/optimiser-data-access.md#rp-and-other-app-side-data',
+    },
+  },
+]

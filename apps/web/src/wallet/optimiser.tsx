@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useConnection } from 'wagmi'
 import { Badge, Banner, Button, RpCaveat, Skeleton } from '@scoutreport/ui'
-import { NAMES, OPTIMISER_SOURCE_LINKS } from '../copy/names'
+import {
+  NAMES,
+  OPTIMISER_EARN_ROUTES,
+  OPTIMISER_SOURCE_LINKS,
+} from '../copy/names'
 import { useOptimiserPortfolio, useWalletKind } from './hooks'
 
 const releaseDate = new Intl.DateTimeFormat('en-GB', {
@@ -46,6 +50,40 @@ function OptimiserCaveats() {
           ))}
       </ul>
     </Banner>
+  )
+}
+
+export function OptimiserEarnRoutes() {
+  const copy = NAMES.optimiserCopy.earnRoutes
+  return (
+    <section aria-labelledby="optimiser-earn-routes" className="space-y-4">
+      <h2 id="optimiser-earn-routes" className="text-xl font-semibold">
+        {copy.heading}
+      </h2>
+      <p className="text-sm text-sr-muted">{copy.description}</p>
+      <ul className="space-y-4">
+        {OPTIMISER_EARN_ROUTES.map((route) => (
+          <li
+            key={route.id}
+            className="space-y-2 rounded border border-sr-border p-4"
+          >
+            <h3 className="font-semibold">{route.name}</h3>
+            <Badge>{copy[route.status]}</Badge>
+            {route.status === 'confirmed' && (
+              <p className="text-sm">{route.howTo}</p>
+            )}
+            <a
+              href={route.source.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-sm underline"
+            >
+              {route.source.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

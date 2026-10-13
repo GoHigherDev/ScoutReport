@@ -10,9 +10,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { normaliseStake } from '@scoutreport/chain'
 import OptimiserPage from '../app/optimiser/page'
 import OptimiserLayout from '../app/optimiser/layout'
-import { NAMES } from '../copy/names'
+import { NAMES, OPTIMISER_EARN_ROUTES } from '../copy/names'
 import type { PortfolioRow } from './hooks'
-import { OptimiserRpCaveat } from './optimiser'
+import { OptimiserEarnRoutes, OptimiserRpCaveat } from './optimiser'
 import pendingFixture from '../../../../packages/chain/src/fixtures/pending-unstakes.json'
 
 const mocks = vi.hoisted(() => ({
@@ -173,6 +173,86 @@ describe('optimiser RP caveat', () => {
       expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     }
   })
+})
+
+describe('optimiser RP routes', () => {
+  it('renders the source-confirmed Socios-app staking route with a safe source link and how-to', () => {
+    render(<OptimiserEarnRoutes />)
+    expect(
+      OPTIMISER_EARN_ROUTES.filter((route) => route.status === 'confirmed').map(
+        (route) => route.id,
+      ),
+    ).toEqual(['staking'])
+    for (const route of OPTIMISER_EARN_ROUTES) {
+      const item = screen
+        .getByRole('heading', { name: route.name })
+        .closest('li')!
+      const link = within(item).getByRole('link', { name: route.source.label })
+      expect(link).toHaveAttribute('href', route.source.href)
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+      if (route.status === 'confirmed') {
+        expect(within(item).getByText('Source-confirmed')).toBeInTheDocument()
+        expect(within(item).getByText(route.howTo)).toBeInTheDocument()
+        expect(link).toHaveAttribute(
+          'href',
+          'https://connect.socios.com/interact-with-chiliz-chain/working-with-staking',
+        )
+        expect(item).toHaveTextContent('Socios.com app (Socios Wallet)')
+      }
+    }
+  })
+
+  it.each(['Fan Zone tasks', 'Polls', 'Quizzes', 'Check-ins'])(
+    'marks %s Unconfirmed with research evidence but no earning instructions',
+    (name) => {
+      render(<OptimiserEarnRoutes />)
+      const item = screen.getByRole('heading', { name }).closest('li')!
+      expect(within(item).getByText('Unconfirmed')).toBeInTheDocument()
+      expect(
+        within(item).queryByText('Source-confirmed'),
+      ).not.toBeInTheDocument()
+      expect(item.querySelector('p')).toBeNull()
+      expect(within(item).getByRole('link')).toHaveAttribute(
+        'href',
+        expect.stringContaining('/docs/research/optimiser-data-access.md'),
+      )
+    },
+  )
+
+  it('contains no RP numbers, financial comparisons, guessed routes or write actions and makes no reads', () => {
+    const { container } = render(<OptimiserEarnRoutes />)
+    expect(container.textContent).not.toMatch(
+      /\d+\s*(RP|Reward Points)|(RP|Reward Points)\s*[:=]?\s*\d+|[£€$]|APY|cheapest|cost.per.point|Token Hunt|CHZ|games/i,
+    )
+    expect(container.textContent).not.toMatch(/you (will|can) (earn|receive)/i)
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(mocks.usePortfolio).not.toHaveBeenCalled()
+    expect(mocks.useWalletKind).not.toHaveBeenCalled()
+    expect(mocks.portfolio.refetch).not.toHaveBeenCalled()
+  })
+
+  it.each(['disconnected', 'loading', 'error', 'empty'] as const)(
+    'keeps all routes visible when portfolio is %s',
+    (state) => {
+      mocks.connection.isConnected = state !== 'disconnected'
+      mocks.portfolio.isPending = state === 'loading'
+      mocks.portfolio.isError = state === 'error'
+      render(
+        <OptimiserLayout>
+          <OptimiserPage />
+        </OptimiserLayout>,
+      )
+      const section = screen.getByRole('region', {
+        name: NAMES.optimiserCopy.earnRoutes.heading,
+      })
+      expect(within(section).getAllByRole('listitem')).toHaveLength(5)
+      expect(within(section).getAllByText('Unconfirmed')).toHaveLength(4)
+      for (const caveat of NAMES.optimiserCopy.caveats) {
+        expect(screen.getAllByText(caveat)).toHaveLength(1)
+      }
+    },
+  )
 })
 
 describe('optimiser checklist', () => {
