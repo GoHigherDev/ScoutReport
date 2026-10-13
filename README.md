@@ -236,6 +236,6 @@ unchanged and does not silently fall back to mocks.
 | `packages/contracts` | Foundry Solidity project                              |
 | `packages/subgraph`  | The Graph subgraph skeleton                           |
 
-Off-chain data will use Postgres with Drizzle ORM, and API endpoints will be
-Next.js route handlers. Subgraph network and contract values are placeholders
+Off-chain data uses Postgres with Drizzle ORM, and API endpoints use Next.js
+route handlers. Subgraph network and contract values are placeholders
 until verified deployments exist.
