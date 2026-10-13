@@ -10,6 +10,9 @@ build/
 coverage/
 *.tsbuildinfo
 generated/
+packages/subgraph/tests/.bin/
+packages/subgraph/tests/.latest.json
+packages/subgraph/tests/.docker/
 
 .env*
 !.env.example

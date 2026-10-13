@@ -73,7 +73,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @scoutreport/subgraph codegen && pnpm --filter @scoutreport/subgraph build
+      - run: pnpm --filter @scoutreport/subgraph lint && pnpm --filter @scoutreport/subgraph typecheck && pnpm --filter @scoutreport/subgraph test
 
   secret-scan:
     name: secret-scan
