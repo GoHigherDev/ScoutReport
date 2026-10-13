@@ -99,7 +99,11 @@ export function useWalletKind() {
       return code && code !== '0x' ? 'contract' : 'eoa'
     },
     enabled: isConnected && Boolean(address),
-    gcTime: 0,
+    staleTime: Infinity,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     retry: false,
   })
   return {

@@ -1,3 +1,6 @@
+const externalWalletCaveat =
+  'Staking from an external wallet does not earn Socios Reward Points. We cannot reliably verify whether this address is a Socios Wallet or qualifies for RP.'
+
 export const NAMES = {
   product: 'ScoutReport',
   xHandle: '@xScoutReport',
@@ -27,9 +30,20 @@ export const NAMES = {
     pendingUnstakes: 'pending unstakes; earliest release shown',
     defaultUnstakePeriod: 'Contract-wide default cooldown (seconds)',
     tokenPeriodUnknown: 'Per-token override unknown',
+    rpCaveat: {
+      externalWalletCaveat,
+      sociosWalletLine:
+        'Staking through the Socios.com app (Socios Wallet) is what earns Socios Reward Points.',
+      eoa: 'This looks like an external wallet. Staking from it does not earn Socios Reward Points.',
+      contract:
+        "Smart account detected (may be a Socios Wallet). If it is your Socios.com Wallet, staking through the Socios app earns Reward Points. We can't confirm this from the address.",
+      stakingLink: 'Socios Connect, Working with Staking',
+      rewardPointsLink: 'Socios Help Centre, How do I earn Reward Points?',
+      votingLink: 'Socios Help Centre, Do I need Fan Tokens to vote?',
+    },
     caveats: [
       'ScoutReport is not affiliated with Socios. Rewards Optimizer shows available on-chain data; it cannot verify your Socios Reward Points or forecast RP yields.',
-      'Staking from an external wallet does not earn Socios Reward Points. We cannot reliably verify whether this address is a Socios Wallet or qualifies for RP.',
+      externalWalletCaveat,
       "To vote, you must own and stake at least one Fan Token of that team. Some polls require more or have additional conditions. Check the poll's requirements in Socios; an on-chain balance does not guarantee eligibility.",
       'Poll coverage may be incomplete. Times and balances reflect the stated capture block and may change. Pending unstake is not a liquid wallet balance.',
     ],
@@ -77,3 +91,18 @@ export const NAMES = {
   disclaimer:
     'ScoutReport is an independent project and is not affiliated with Socios.com or Chiliz.',
 } as const
+
+export const OPTIMISER_SOURCE_LINKS = [
+  {
+    label: NAMES.optimiserCopy.rpCaveat.stakingLink,
+    href: 'https://connect.socios.com/interact-with-chiliz-chain/working-with-staking',
+  },
+  {
+    label: NAMES.optimiserCopy.rpCaveat.rewardPointsLink,
+    href: 'https://helpcenter.socios.com/en/articles/472518-how-do-i-earn-reward-points',
+  },
+  {
+    label: NAMES.optimiserCopy.rpCaveat.votingLink,
+    href: 'https://helpcenter.socios.com/en/articles/472529-do-i-need-fan-tokens-to-vote',
+  },
+] as const

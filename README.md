@@ -63,10 +63,25 @@ Held and Unstaked both mean liquid `balanceOf`, not pending unstake; Staked uses
 Balance/stake reads share the displayed capture block. Token metadata is cached
 and read once per token; one failed token does not discard successful rows.
 
-Liquid-only rows show the approved Socios.com staking prompt, with the four
-approved research caveats inline. This is not financial advice or a promise of
-RP/voting eligibility. No RP estimates, yields, wallet-brand detection, deep
-links or new API endpoints are included. Tests use mocked reads, never live RPC.
+Liquid-only rows show the approved Socios.com staking prompt. SR-53 adds a shared
+warning banner on every `/optimiser/*` page, including when disconnected. It
+shows the approved external-wallet RP caveat once; the other three approved
+research caveats remain in the checklist. The banner links to the Socios Connect
+staking guide and Help Centre RP/voting articles.
+
+The existing client-side `useWalletKind()` Mainnet account-code read supplies
+context only: EOA shows the external-wallet note; code presence shows the
+conditional smart-account note. Loading or failed reads show no wallet-type
+note. Neither code (including EIP-7702 delegation) nor connector choice verifies
+Socios Wallet identity or RP eligibility. Results stay fresh indefinitely while
+cached and are retained for 30 minutes after the last observer unmounts, keyed by
+DATA_CHAIN and address. Remounts, focus and reconnects do not trigger automatic
+code reads; a new address triggers one read. Brave approved the banner sentence
+and both notes on 13 October 2026 at 18:38 UK; link labels still require approval.
+
+This is not financial advice or a promise of RP/voting eligibility. No RP
+estimates, yields, wallet-brand detection, signing/staking actions, polling or
+new API endpoints are included. Tests use mocked reads, never live RPC.
 
 ## Backend and local database
 
@@ -154,7 +169,7 @@ and CI caching/timing. GitHub Actions validates pull requests and pushes to
 | `pnpm dev`                                  | Run the Next.js web app                             |
 | `pnpm turbo run build`                      | Build all packages and apps                         |
 | `pnpm turbo run lint typecheck test build`  | Lint, typecheck, test, and build workspace projects |
-| `pnpm --filter @scoutreport/contracts test` | Run Foundry scaffold and staking mock tests          |
+| `pnpm --filter @scoutreport/contracts test` | Run Foundry scaffold and staking mock tests         |
 | `pnpm format`                               | Format workspace files with Prettier                |
 | `pnpm format:check`                         | Check formatting                                    |
 

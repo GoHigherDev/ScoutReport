@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useConnection } from 'wagmi'
-import { Badge, Banner, Button, Skeleton } from '@scoutreport/ui'
-import { NAMES } from '../copy/names'
-import { useOptimiserPortfolio } from './hooks'
+import { Badge, Banner, Button, RpCaveat, Skeleton } from '@scoutreport/ui'
+import { NAMES, OPTIMISER_SOURCE_LINKS } from '../copy/names'
+import { useOptimiserPortfolio, useWalletKind } from './hooks'
 
 const releaseDate = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Europe/London',
@@ -17,13 +17,33 @@ const releaseDate = new Intl.DateTimeFormat('en-GB', {
   hourCycle: 'h23',
 })
 
+export function OptimiserRpCaveat() {
+  const { kind, isPending, isError } = useWalletKind()
+  const copy = NAMES.optimiserCopy.rpCaveat
+  return (
+    <RpCaveat
+      caveat={copy.externalWalletCaveat}
+      sociosWalletLine={copy.sociosWalletLine}
+      walletTypeNote={
+        kind === undefined || isPending || isError ? undefined : copy[kind]
+      }
+      links={OPTIMISER_SOURCE_LINKS}
+    />
+  )
+}
+
 function OptimiserCaveats() {
   return (
     <Banner variant="warning">
       <ul className="space-y-2 text-sm">
-        {NAMES.optimiserCopy.caveats.map((caveat) => (
-          <li key={caveat}>{caveat}</li>
-        ))}
+        {NAMES.optimiserCopy.caveats
+          .filter(
+            (caveat) =>
+              caveat !== NAMES.optimiserCopy.rpCaveat.externalWalletCaveat,
+          )
+          .map((caveat) => (
+            <li key={caveat}>{caveat}</li>
+          ))}
       </ul>
     </Banner>
   )

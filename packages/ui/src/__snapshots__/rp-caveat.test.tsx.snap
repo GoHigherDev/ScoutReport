@@ -1,0 +1,64 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`RpCaveat > renders a warning with optional context Account context and safe source links 1`] = `
+<DocumentFragment>
+  <div
+    class="rounded-lg border-l-4 p-4 border-sr-warning bg-sr-surface text-sr-warning space-y-2 text-sm"
+    role="status"
+  >
+    <p>
+      Caveat text
+    </p>
+    <p>
+      App staking context
+    </p>
+    <p>
+      Account context
+    </p>
+    <ul
+      class="space-y-1"
+    >
+      <li>
+        <a
+          class="rounded-sm underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sr-warning"
+          href="https://example.com/staking"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Source
+        </a>
+      </li>
+    </ul>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`RpCaveat > renders a warning with optional context undefined and safe source links 1`] = `
+<DocumentFragment>
+  <div
+    class="rounded-lg border-l-4 p-4 border-sr-warning bg-sr-surface text-sr-warning space-y-2 text-sm"
+    role="status"
+  >
+    <p>
+      Caveat text
+    </p>
+    <p>
+      App staking context
+    </p>
+    <ul
+      class="space-y-1"
+    >
+      <li>
+        <a
+          class="rounded-sm underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sr-warning"
+          href="https://example.com/staking"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Source
+        </a>
+      </li>
+    </ul>
+  </div>
+</DocumentFragment>
+`;
