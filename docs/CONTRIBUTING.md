@@ -41,7 +41,7 @@ four successful status checks before merge:
 
 - `web+packages`: lint, typecheck, tests and builds for workspace packages.
 - `contracts`: `forge fmt --check`, `forge build`, `forge test -vvv`.
-- `subgraph`: Graph codegen and build.
+- `subgraph`: lint, Graph codegen, both network manifest builds and offline Matchstick tests.
 - `secret-scan`: Gitleaks scans the full Git history with findings redacted.
 
 Do not bypass these requirements. Workflow files do not configure branch

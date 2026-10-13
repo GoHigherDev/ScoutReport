@@ -8,6 +8,7 @@ dataSources:
     source:
       address: '0x02728748392F1875682940681F4C936Fc683A68e'
       abi: ERC20
+      startBlock: 31150409
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -27,6 +28,7 @@ dataSources:
     source:
       address: '0x76088F3eD5dC655De9295D93868ec1EeC654A615'
       abi: ERC20
+      startBlock: 32619372
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -46,6 +48,7 @@ dataSources:
     source:
       address: '0x5ff7f9724fd477d9a07dcdb894d0ca7f8fae1501'
       abi: Staking
+      startBlock: 20901330
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

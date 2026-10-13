@@ -3,6 +3,9 @@
 ScoutReport is a third-party SportFi dapp on Chiliz Chain that adds utility on
 top of Socios.com Fan Tokens. It is not affiliated with Socios.
 
+For NAVI/AFC indexing, deployment commands and GraphQL examples, see the
+[Scout Rating subgraph guide](packages/subgraph/README.md).
+
 ## Prerequisites
 
 - Node.js LTS (22 or newer; Node 24 is selected in `.nvmrc`)
