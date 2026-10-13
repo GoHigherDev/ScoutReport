@@ -374,6 +374,69 @@ contract ScoutReportPredictionsTest {
         require(predictions.pointsOf(BOB) == 10);
     }
 
+    function testFuzzVariableBatchCredits(
+        uint16 predictorCount,
+        bytes32 picksSeed,
+        uint8 result,
+        uint32 points,
+        bytes32 batchSeed
+    ) public {
+        predictorCount = 1 + predictorCount % 200;
+        result %= 3;
+        points = 1 + points % 100;
+        predictions.createMatch(MATCH_ID, deadline, 3, points);
+        uint8[] memory outcomes = new uint8[](predictorCount);
+        uint256 correctPicks;
+        for (uint256 i; i < predictorCount; i++) {
+            uint256 pickSeed = uint256(keccak256(abi.encode(picksSeed, i)));
+            uint8 outcome = uint8(pickSeed % 3);
+            pick(address(uint160(i + 100)), outcome);
+            if (pickSeed & 1 != 0) {
+                outcome = (outcome + 1) % 3;
+                pick(address(uint160(i + 100)), outcome);
+            }
+            outcomes[i] = outcome;
+            if (outcome == result) correctPicks++;
+        }
+        require(predictions.getMatch(MATCH_ID).predictorCount == predictorCount);
+        vm.warp(deadline);
+        predictions.settle(MATCH_ID, result);
+        uint256 cursor;
+        uint256 iteration;
+        while (cursor < predictorCount) {
+            {
+                uint256 batchSize = 1 + uint256(keccak256(abi.encode(batchSeed, iteration))) % predictorCount;
+                predictions.creditPoints(MATCH_ID, batchSize);
+                uint256 expectedCursor = cursor + batchSize;
+                if (expectedCursor > predictorCount) expectedCursor = predictorCount;
+                uint256 nextCursor = predictions.getMatch(MATCH_ID).creditedCursor;
+                require(nextCursor > cursor && nextCursor == expectedCursor);
+                cursor = nextCursor;
+            }
+            uint256 creditedCorrectPicks;
+            uint256 sum;
+            for (uint256 i; i < predictorCount; i++) {
+                bool creditedCorrect = i < cursor && outcomes[i] == result;
+                uint256 userPoints = predictions.pointsOf(address(uint160(i + 100)));
+                require(userPoints == (creditedCorrect ? points : 0));
+                sum += userPoints;
+                if (creditedCorrect) creditedCorrectPicks++;
+            }
+            require(sum == creditedCorrectPicks * points);
+            if (cursor == predictorCount) require(sum == correctPicks * points);
+            iteration++;
+        }
+        predictions.creditPoints(MATCH_ID, 1);
+        require(predictions.getMatch(MATCH_ID).creditedCursor == cursor && cursor == predictorCount);
+        uint256 finalSum;
+        for (uint256 i; i < predictorCount; i++) {
+            uint256 userPoints = predictions.pointsOf(address(uint160(i + 100)));
+            require(userPoints == (outcomes[i] == result ? points : 0));
+            finalSum += userPoints;
+        }
+        require(finalSum == correctPicks * points);
+    }
+
     function testFuzzPointsValidation(uint32 points) public {
         if (points == 0 || points > 100) {
             vm.expectRevert(ScoutReportPredictions.InvalidPointsForCorrect.selector);

@@ -76,8 +76,11 @@ forge inspect ScoutReportPredictions abi --json > ../chain/abis/ScoutReportPredi
 
 Tests cover points boundaries 0, 1, 100 and 101, outcome/count validation,
 duplicates, missing matches, roles, pause, deadline boundaries, changing picks,
-double settlement, voiding and paginated crediting. The 500-predictor test
-reports gas per batch; gas is an EVM test measurement, not a Spicy fee estimate.
+double settlement, voiding and paginated crediting. A conservation fuzz test
+varies 1–200 predictors, picks, result, 1–100 points and successive batch sizes,
+then checks total credited points and that an extra completed-batch call adds
+nothing. The 500-predictor test reports gas per batch; gas is an EVM test
+measurement, not a Spicy fee estimate.
 
 The local Foundry run measured five all-correct batches of 100 predictors with
 storage access cooled before each call:
