@@ -96,6 +96,48 @@ export const readStakeDataLatest = async (
 }
 
 /**
+ * Simulates all stake refreshes in Multicall3 via eth_call, without persisting
+ * state. simulateContract disables automatic batching, so use an explicit
+ * multicall for portfolio reads rather than one simulation RPC per token.
+ */
+export const readStakeDataLatestBatch = async (
+  client: PublicClient,
+  user: Address,
+  tokens: readonly Address[],
+): Promise<NormalisedStake[]> => {
+  if (!isAddress(user)) throw new Error(`Invalid wallet address: ${user}`)
+  tokens.forEach((token) => validateRead(client, token))
+  if (tokens.length === 0) return []
+  const [results, metas] = await Promise.all([
+    client.multicall({
+      allowFailure: false,
+      contracts: tokens.flatMap((token) => [
+        {
+          address: STAKING_ADDRESS,
+          abi: stakingAbi,
+          functionName: 'getStakeDataLatest',
+          args: [user, token, false],
+        },
+        {
+          address: token,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [user],
+        },
+      ]),
+    }),
+    Promise.all(tokens.map((token) => readTokenMeta(chiliz.id, token))),
+  ])
+  return tokens.map((_, index) =>
+    normaliseStake(
+      results[index * 2 + 1] as bigint,
+      (results[index * 2] as StakeDataResponse).totalStake,
+      metas[index].decimals,
+    ),
+  )
+}
+
+/**
  * Contract-wide period in seconds, not a token amount. The token argument is
  * validated for API compatibility only; unstakePeriod() has no arguments and
  * does not expose any per-token override set by setUnstakePeriodForToken.

@@ -21,6 +21,32 @@ export const NAMES = {
   privacy: 'Privacy',
   terms: 'Terms',
   connectWallet: 'Connect wallet',
+  wallet: {
+    disconnect: 'Disconnect',
+    unavailable:
+      'Wallet connection is unavailable. Set NEXT_PUBLIC_REOWN_PROJECT_ID.',
+    connectionError: 'Unable to open wallet connection. Please try again.',
+    disconnectError: 'Unable to disconnect. Please try again.',
+    spicy: 'Spicy',
+    mainnet: 'Mainnet',
+    unsupportedNetwork: 'Unsupported network',
+    wrongNetwork: 'Your wallet is on a different network.',
+    switchSpicy: 'Switch to Spicy',
+    switchMainnet: 'Switch to Mainnet',
+    switching: 'Switching network…',
+    switchRejected:
+      'Network change rejected. Please approve the change in your wallet.',
+    switchError: 'Unable to change network. Please try again.',
+    holdings: 'Your Fan Tokens',
+    held: 'Held',
+    staked: 'Staked',
+    loading: 'Loading Fan Token holdings…',
+    empty: 'No Fan Token holdings or stakes found on Mainnet.',
+    rpcError: 'Unable to load Fan Token holdings from Mainnet.',
+    retry: 'Try again',
+    stakingCaveat:
+      'Staked amounts are not Reward Points. External-wallet staking does not earn Socios Reward Points.',
+  },
   network: 'Network',
   disclaimer:
     'ScoutReport is an independent project and is not affiliated with Socios.com or Chiliz.',

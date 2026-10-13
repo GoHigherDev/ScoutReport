@@ -12,6 +12,7 @@ export {
   STAKING_ADDRESS,
   normaliseStake,
   readStakeDataLatest,
+  readStakeDataLatestBatch,
   readUnstakePeriod,
   type NormalisedStake,
   type StakeDataResponse,

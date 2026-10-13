@@ -44,9 +44,17 @@ const zeroStake: StakeDataResponse = {
   totalLockedPerEventType: [],
 }
 
-const setup = async (decimals = 18, held = 0n, stake = zeroStake) => {
+const setup = async (
+  decimals = 18,
+  held = 0n,
+  stake = zeroStake,
+  allTokens = false,
+) => {
   const helpers = await import('./index.ts')
   const token = helpers.getTokenAddress(helpers.FAN_TOKENS[0], 88888)!
+  const allowedTokens = (
+    allTokens ? helpers.FAN_TOKENS : helpers.FAN_TOKENS.slice(0, 1)
+  ).map((item) => helpers.getTokenAddress(item, 88888)!.toLowerCase())
   const user = fixture.wallet as Address
   const calls: string[] = []
   const reply = (to: Address, data: Hex): Hex => {
@@ -55,7 +63,11 @@ const setup = async (decimals = 18, held = 0n, stake = zeroStake) => {
     calls.push(decoded.functionName)
     if (proxy) {
       if (decoded.functionName === 'getStakeDataLatest') {
-        expect(decoded.args).toEqual([user, token, false])
+        expect(decoded.args?.[0]).toBe(user)
+        expect(allowedTokens).toContain(
+          (decoded.args?.[1] as string).toLowerCase(),
+        )
+        expect(decoded.args?.[2]).toBe(false)
         return encodeFunctionResult({
           abi,
           functionName: 'getStakeDataLatest',
@@ -70,7 +82,7 @@ const setup = async (decimals = 18, held = 0n, stake = zeroStake) => {
         result: BigInt(fixture.unstakePeriodSeconds),
       })
     }
-    expect(to.toLowerCase()).toBe(token.toLowerCase())
+    expect(allowedTokens).toContain(to.toLowerCase())
     switch (decoded.functionName) {
       case 'balanceOf':
         expect(decoded.args).toEqual([user])
@@ -196,6 +208,81 @@ describe('read-only Socios staking', () => {
     const otherToken = h.getTokenAddress(h.FAN_TOKENS[1], 88888)!
     expect(await h.readUnstakePeriod(h.client, otherToken)).toBe(604800n)
     expect(h.calls).toEqual(['unstakePeriod', 'unstakePeriod'])
+  })
+
+  it('batches stake refreshes and liquid balances into read-only multicalls (synthetic)', async () => {
+    const h = await setup(6, 1234567n, { ...zeroStake, totalStake: 2000000n })
+    const results = await h.readStakeDataLatestBatch(h.client, h.user, [
+      h.token,
+      h.token,
+    ])
+    expect(results).toHaveLength(2)
+    expect(results[0].formatted).toMatchObject({
+      held: '1.234567',
+      staked: '2',
+      totalScoutRating: '3.234567',
+    })
+    expect(results[1]).toEqual(results[0])
+    expect(request).toHaveBeenCalledTimes(1)
+    for (const [rpc] of request.mock.calls) {
+      expect(rpc.method).toBe('eth_call')
+      expect(rpc.params[0].to.toLowerCase()).toBe(
+        h.chiliz.contracts.multicall3.address.toLowerCase(),
+      )
+    }
+    const decoded = decodeFunctionData({
+      abi: multicall3Abi,
+      data: request.mock.calls[0][0].params[0].data,
+    })
+    if (decoded.functionName !== 'aggregate3')
+      throw new Error('Expected aggregate3')
+    expect(decoded.args[0]).toHaveLength(7)
+  })
+
+  it('reads the whole configured portfolio with fewer RPC requests than tokens (synthetic)', async () => {
+    const h = await setup(6, 1n, zeroStake, true)
+    const tokens = h.FAN_TOKENS.map((token) => h.getTokenAddress(token, 88888)!)
+    const results = await h.readStakeDataLatestBatch(h.client, h.user, tokens)
+    expect(results).toHaveLength(tokens.length)
+    expect(
+      results.every((result) => result.formatted.held === '0.000001'),
+    ).toBe(true)
+    expect(request.mock.calls.length).toBeLessThan(tokens.length)
+    for (const [rpc] of request.mock.calls) {
+      expect(rpc.method).toBe('eth_call')
+      expect(rpc.params[0].to.toLowerCase()).toBe(
+        h.chiliz.contracts.multicall3.address.toLowerCase(),
+      )
+    }
+    expect(
+      h.calls.filter((name) => name === 'getStakeDataLatest'),
+    ).toHaveLength(tokens.length)
+    expect(h.calls.filter((name) => name === 'balanceOf')).toHaveLength(
+      tokens.length,
+    )
+  })
+
+  it('skips empty batches and rejects invalid batch reads without RPC', async () => {
+    const h = await setup()
+    expect(await h.readStakeDataLatestBatch(h.client, h.user, [])).toEqual([])
+    await expect(
+      h.readStakeDataLatestBatch(h.getPublicClient(88882), h.user, [h.token]),
+    ).rejects.toThrow('Mainnet')
+    await expect(
+      h.readStakeDataLatestBatch(h.client, 'invalid' as Address, [h.token]),
+    ).rejects.toThrow('wallet')
+    await expect(
+      h.readStakeDataLatestBatch(h.client, h.user, ['invalid' as Address]),
+    ).rejects.toThrow('token')
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it('propagates batch RPC errors rather than returning fabricated zero holdings', async () => {
+    const h = await setup()
+    request.mockRejectedValue(new Error('RPC unavailable'))
+    await expect(
+      h.readStakeDataLatestBatch(h.client, h.user, [h.token]),
+    ).rejects.toThrow('RPC unavailable')
   })
 
   it('uses on-chain decimals and totalStake without adding locked/pending amounts (synthetic)', async () => {

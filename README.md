@@ -24,6 +24,26 @@ and fill in only values for services you have configured. Set
 `NEXT_PUBLIC_SITE_URL` to the public site origin for production Open Graph links;
 it defaults to `http://localhost:3000` when left empty. Do not commit secrets.
 
+## Wallet shell
+
+Set `NEXT_PUBLIC_REOWN_PROJECT_ID` in the ignored `apps/web/.env.local` and
+allow the site origin in Reown to enable AppKit, injected wallets (including
+MetaMask), WalletConnect QR and the featured Socios.com Wallet. Without an ID,
+the app still builds and renders with a disabled connect button and notice.
+The wagmi adapter and hooks share a pinned `@wagmi/core`; the WalletConnect
+provider peer is pinned to avoid older React-incompatible dependencies.
+
+The header shows the connected address and network and offers `ensureChain`
+switching to APP_CHAIN. Holdings read every configured Mainnet token in
+Multicall3 batches only while connected, skip tokens without a Mainnet address
+and display only non-zero held/staked amounts. Metadata and decimals come from
+`readTokenMeta`; Scout Rating is held + staked. Staking refreshes use read-only
+`eth_call`, never a transaction. Staked amounts are not Reward Points.
+`useWalletKind()` checks code on DATA_CHAIN for future ERC-1271 flows; it does
+not identify a wallet brand. No SIWE or Partner API is included.
+
+See [the manual wallet QA matrix](docs/qa/wallet.md) for desktop/mobile checks.
+
 ## Backend and local database
 
 The API uses Next.js Node.js route handlers and Drizzle with standard Postgres
