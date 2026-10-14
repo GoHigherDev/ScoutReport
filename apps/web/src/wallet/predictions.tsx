@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getAccount, signTypedData } from '@wagmi/core'
 import { Button } from '@scoutreport/ui'
-import { useAccount } from 'wagmi'
+import { useConnection } from 'wagmi'
 import { NAMES } from '../copy/names'
 import {
   pickTypedData,
@@ -39,6 +39,15 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
   })
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}))
+    if (response.status === 429) {
+      const delay = Number(response.headers.get('Retry-After'))
+      throw new PredictError(
+        429,
+        Number.isInteger(delay) && delay > 0
+          ? `${NAMES.predict.rateLimited} ${NAMES.predict.retryAfter}: ${delay}.`
+          : NAMES.predict.rateLimited,
+      )
+    }
     const known = Object.values(NAMES.predict).includes(payload.message)
     throw new PredictError(
       response.status,
@@ -71,13 +80,13 @@ function rejected(error: unknown) {
 }
 
 export function Predictions() {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const wallet = isConnected ? address?.toLowerCase() : undefined
   const identity = useRef({ wallet, epoch: 0 })
   if (identity.current.wallet !== wallet)
     identity.current = { wallet, epoch: identity.current.epoch + 1 }
   const epoch = identity.current.epoch
-  const running = useRef(false)
+  const running = useRef<number | undefined>(undefined)
   const [version, setVersion] = useState(0)
   const [tab, setTab] = useState<'matches' | 'mine'>('matches')
   const [pagination, setPagination] = useState<{
@@ -95,11 +104,17 @@ export function Predictions() {
   }>()
   const age = ageSelection?.epoch === epoch && ageSelection.checked
   const terms = termsSelection?.epoch === epoch && termsSelection.checked
-  const [state, setState] = useState<
+  type ActionState =
     'idle' | 'signingIn' | 'savingEligibility' | 'signing' | 'saving'
-  >('idle')
+  const [operation, setOperation] = useState<{
+    epoch: number
+    state: ActionState
+  }>()
+  const state = operation?.epoch === epoch ? operation.state : 'idle'
+  const setState = (value: ActionState) => setOperation({ epoch, state: value })
   const [notice, setNotice] = useState<{
     wallet: string
+    epoch: number
     text: string
     error: boolean
   }>()
@@ -163,9 +178,9 @@ export function Predictions() {
     initial: typeof state,
     action: (expected: string) => Promise<void>,
   ) {
-    if (!wallet || running.current) return
+    if (!wallet || running.current === epoch) return
     const expected = wallet
-    running.current = true
+    running.current = epoch
     setNotice(undefined)
     setState(initial)
     try {
@@ -179,6 +194,7 @@ export function Predictions() {
         if (initial === 'signing')
           setNotice({
             wallet: expected,
+            epoch,
             text: NAMES.predict.saved,
             error: false,
           })
@@ -190,6 +206,7 @@ export function Predictions() {
       ) {
         setNotice({
           wallet: expected,
+          epoch,
           text: rejected(error)
             ? NAMES.predict.rejected
             : error instanceof PredictError ||
@@ -203,8 +220,8 @@ export function Predictions() {
         setVersion((value) => value + 1)
       }
     } finally {
-      running.current = false
-      setState('idle')
+      if (running.current === epoch) running.current = undefined
+      if (identity.current.epoch === epoch) setState('idle')
     }
   }
 
@@ -399,9 +416,13 @@ export function Predictions() {
                         {NAMES.predict.yourPick}: {match.outcome}
                       </p>
                     )}
-                    {match.result && (
+                    {(match.result || tab === 'mine') && (
                       <p>
-                        {NAMES.predict.result}: {match.result}
+                        {NAMES.predict.result}:{' '}
+                        {match.result ??
+                          (status === 'voided'
+                            ? NAMES.predict.voided
+                            : NAMES.predict.resultPending)}
                       </p>
                     )}
                     {match.voidReason && (
@@ -448,7 +469,7 @@ export function Predictions() {
             </>
           )}
           {busy && <p role="status">{NAMES.predict[state]}</p>}
-          {notice?.wallet === wallet && (
+          {notice?.wallet === wallet && notice.epoch === epoch && (
             <p role={notice.error ? 'alert' : 'status'}>{notice.text}</p>
           )}
           <Button

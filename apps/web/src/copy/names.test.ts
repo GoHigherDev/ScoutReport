@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs'
+import ts from 'typescript'
 import { expect, it } from 'vitest'
+import { pickTypedData } from '../lib/predict'
 import { NAMES } from './names'
 
 it('keeps research and wallet-unavailable copy free of internal references', () => {
@@ -94,5 +97,39 @@ it('keeps all gas and transaction copy neutral', () => {
   const { errors, ...copy } = NAMES.gas
   for (const text of [...Object.values(copy), ...Object.values(errors)]) {
     expect(text).not.toMatch(bannedCopy)
+  }
+})
+it('centralises Predict copy and its signing domain, preserving the unapproved tab placeholder', () => {
+  expect(NAMES.predict.predictionsTab).toBe('My [PREDICTIONS_TAB_NAME]')
+  expect(NAMES.predict.signatureHelp).toMatch(/no funds are moved/i)
+  expect(
+    pickTypedData('https://scoutreport.test', 88882, {
+      matchId: 'fixture',
+      outcome: 'HOME',
+      nonce: 'fixture',
+    }).domain.name,
+  ).toBe(NAMES.predict.signatureDomain)
+  for (const value of Object.values(NAMES.predict)) {
+    expect(typeof value).toBe('string')
+    expect(value.trim()).not.toBe('')
+  }
+  for (const file of ['../wallet/predictions.tsx', '../app/predict/page.tsx']) {
+    const source = readFileSync(new URL(file, import.meta.url), 'utf8')
+    const inlineCopy: string[] = []
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxText(node) && /[A-Za-z]/.test(node.text))
+        inlineCopy.push(node.text.trim())
+      ts.forEachChild(node, visit)
+    }
+    visit(
+      ts.createSourceFile(
+        file,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      ),
+    )
+    expect(inlineCopy, file).toEqual([])
   }
 })

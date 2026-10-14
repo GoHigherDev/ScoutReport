@@ -115,6 +115,7 @@ export function requirePredictOrigin(request: Request) {
   if (request.headers.get('Origin') !== url.origin) {
     throw forbidden(NAMES.predict.originRequired)
   }
+  return url.origin
 }
 
 type PredictRouteOptions = {

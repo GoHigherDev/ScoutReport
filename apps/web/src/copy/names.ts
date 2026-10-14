@@ -100,7 +100,7 @@ export const NAMES = {
   predict: {
     heading: 'Predict',
     signatureDomain: 'ScoutReport',
-    predictionsTab: '[PREDICTIONS_TAB_NAME]',
+    predictionsTab: 'My [PREDICTIONS_TAB_NAME]',
     matchesTab: 'Matches',
     upcoming: 'Upcoming',
     locked: 'Locked',
@@ -109,6 +109,7 @@ export const NAMES = {
     kickoff: 'Kickoff (Europe/London)',
     lockTime: 'Lock time (Europe/London)',
     result: 'Result',
+    resultPending: 'Pending',
     yourPick: 'Your pick',
     points: 'Prediction points',
     pointsForCorrect: 'Points for a correct pick',
@@ -134,9 +135,11 @@ export const NAMES = {
     saving: 'Saving pick…',
     saved: 'Pick saved.',
     signatureHelp:
-      'A wallet signature is required. No gas or transaction is needed.',
+      'A wallet signature is required. No gas or transaction is needed, and no funds are moved.',
     rejected: 'Signature cancelled. Your pick has not changed.',
     error: 'Unable to complete this action. Refresh and try again.',
+    rateLimited: 'Too many requests. Wait before refreshing and trying again.',
+    retryAfter: 'Retry after (seconds)',
     invalidSignature: 'The signature does not match your signed-in wallet.',
     invalidNonce:
       'This signing request has expired or already been used. Try again.',

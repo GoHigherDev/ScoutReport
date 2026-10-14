@@ -471,6 +471,9 @@ rate limit; write requests must come from `NEXT_PUBLIC_SITE_URL`.
 the latter also returns the wallet's total points independently of pagination.
 `GET /api/predict/eligibility` supplies the current terms version and gate state.
 The existing age-confirmation and terms-acceptance endpoints record those gates.
+The existing SIWE routes still fail closed in production until their shared
+auth limiter and trusted identity resolver are wired in; this ticket does not
+weaken those unauthenticated-route guards.
 
 Each pick or change requires an EIP-712 wallet signature binding the match,
 outcome and a single-use server nonce. Verification supports EOAs and ERC-1271
@@ -484,7 +487,9 @@ typed data, then send `{ matchId, outcome, nonce, signature }` to
 one replaces the wallet's previous challenge. Points come
 from SR-44 scoring and have no cash value; no prizes are offered.
 
-Apply existing migrations with `pnpm db:migrate`. Reuse the SIWE configuration,
+Apply migrations with `pnpm db:migrate`, including
+`0004_predict_wallet_serialisation.sql` for first-pick/erasure serialisation.
+Reuse the SIWE configuration,
 `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL` and SR-41 country/erasure settings;
 never put secrets in browser configuration. `erasePredictData(address, tx)`
 deletes picks, points and wallet-linked nonces and removes recoverable signatures

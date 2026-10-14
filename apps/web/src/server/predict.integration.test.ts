@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
@@ -427,6 +427,23 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     ).toBe(true)
   })
 
+  it('verifies signatures against configured origin even when the ingress request host differs', async () => {
+    const f = await pickFixture()
+    const pick = await f.signed()
+    const ingress = new Request(
+      'http://internal-ingress.invalid/api/predict/picks',
+      {
+        method: 'POST',
+        headers: f.request.headers,
+      },
+    )
+    await predictionStore.submit(pick, f.session, ingress, verifyPickSignature)
+    expect(
+      await client`SELECT * FROM picks WHERE address = ${f.address}`,
+    ).toHaveLength(1)
+    await erasePredictData(f.address)
+  })
+
   it('rolls back nonce consumption, pick and audit on invalid signatures or audit failure', async () => {
     const f = await pickFixture()
     const pick = await f.signed()
@@ -550,6 +567,16 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     throw new Error(`No blocked ${fragment} query`)
   }
 
+  async function directErasure(address: string) {
+    const eraser = postgres(url!, { max: 1 })
+    const pseudonym = `erased:${createHmac('sha256', process.env.PREDICT_ERASURE_SECRET!).update(address).digest('hex')}`
+    try {
+      await eraser`SELECT erase_predict_data(${address}, ${pseudonym})`
+    } finally {
+      await eraser.end()
+    }
+  }
+
   it('rechecks current eligibility AFTER the match lock and rolls back challenge consumption', async () => {
     const f = await pickFixture()
     const pick = await f.signed()
@@ -577,7 +604,7 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     await erasePredictData(f.address)
   }, 10_000)
 
-  it('serialises erasure with a first pick even when erasure cannot initially see its match', async () => {
+  it('serialises direct database erasure with a first pick even when erasure cannot initially see its match', async () => {
     const f = await pickFixture()
     const pick = await f.signed()
     let attempt!: Promise<unknown>
@@ -591,8 +618,8 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
         verifyPickSignature,
       )
       await waitForBlockedQuery(locker, 'matches')
-      erasure = erasePredictData(f.address)
-      await waitForBlockedQuery(locker, 'pg_advisory_xact_lock')
+      erasure = directErasure(f.address)
+      await waitForBlockedQuery(locker, 'erase_predict_data')
     })
     await attempt
     await erasure
@@ -610,6 +637,77 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     await expect(
       predictionStore.submit(pick, f.session, f.request, verifyPickSignature),
     ).rejects.toMatchObject({ status: 409 })
+  }, 10_000)
+
+  it('serialises direct erasure with challenge issuance so no newly issued nonce survives', async () => {
+    const f = await pickFixture()
+    let issuance!: ReturnType<typeof predictionStore.issueNonce>
+    let erasure!: Promise<void>
+    await client.begin(async (locker) => {
+      await locker`SELECT id FROM matches WHERE id = ${f.matchId} FOR UPDATE`
+      issuance = predictionStore.issueNonce(
+        { matchId: f.matchId, outcome: 'HOME' },
+        f.session,
+        f.request,
+      )
+      await waitForBlockedQuery(locker, 'matches')
+      erasure = directErasure(f.address)
+      await waitForBlockedQuery(locker, 'erase_predict_data')
+    })
+    await issuance
+    await erasure
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    expect(
+      await client`SELECT * FROM predict_terms_acceptances WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    await expect(
+      predictionStore.issueNonce(
+        { matchId: f.matchId, outcome: 'HOME' },
+        f.session,
+        f.request,
+      ),
+    ).rejects.toMatchObject({ status: 403 })
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+  }, 10_000)
+
+  it('rejects queued first picks and nonce issuance when direct erasure wins the wallet lock', async () => {
+    const f = await pickFixture()
+    const pick = await f.signed()
+    let submission!: ReturnType<typeof predictionStore.submit>
+    let issuance!: ReturnType<typeof predictionStore.issueNonce>
+    const pseudonym = `erased:${createHmac('sha256', process.env.PREDICT_ERASURE_SECRET!).update(f.address).digest('hex')}`
+    await client.begin(async (eraser) => {
+      await eraser`SELECT erase_predict_data(${f.address}, ${pseudonym})`
+      submission = predictionStore.submit(
+        pick,
+        f.session,
+        f.request,
+        verifyPickSignature,
+      )
+      issuance = predictionStore.issueNonce(
+        { matchId: f.matchId, outcome: 'HOME' },
+        f.session,
+        f.request,
+      )
+      void submission.catch(() => {})
+      void issuance.catch(() => {})
+      await waitForBlockedQuery(eraser, 'pg_advisory_xact_lock')
+    })
+    await expect(submission).rejects.toMatchObject({ status: 409 })
+    await expect(issuance).rejects.toMatchObject({ status: 403 })
+    expect(
+      await client`SELECT * FROM picks WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    expect(
+      await client`SELECT * FROM prediction_audit WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE address = ${f.address}`,
+    ).toHaveLength(0)
   }, 10_000)
 
   it('uses a real SIWE session and shared limiter for routes, and exposes own points including voids', async () => {
@@ -680,6 +778,76 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     await client`DELETE FROM predict_nonces WHERE nonce = ANY(${expired}::text[])`
     await erasePredictData(f.address)
   })
+
+  it('issues challenges concurrently without deadlock when two wallets replace expired nonces', async () => {
+    const first = await pickFixture()
+    const second = await pickFixture()
+    await client`INSERT INTO predict_nonces (nonce, address, expires_at) VALUES
+      (${randomBytes(32).toString('hex')}, ${first.address}, now() - interval '1 hour'),
+      (${randomBytes(32).toString('hex')}, ${second.address}, now() - interval '1 hour')`
+    // Pause both own-wallet deletions after they take row locks, so each
+    // expiry cleanup must skip the other transaction's locked expired row.
+    await client.unsafe(`
+      CREATE FUNCTION sr45_nonce_cleanup_barrier() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF OLD.address IN ('${first.address}', '${second.address}') THEN
+          PERFORM pg_advisory_xact_lock(hashtextextended(OLD.address, 46));
+        END IF;
+        RETURN OLD;
+      END; $$;
+      CREATE TRIGGER sr45_nonce_cleanup_barrier AFTER DELETE ON predict_nonces
+      FOR EACH ROW EXECUTE FUNCTION sr45_nonce_cleanup_barrier();
+    `)
+    const attempts: ReturnType<typeof predictionStore.issueNonce>[] = []
+    try {
+      await client.begin(async (barrier) => {
+        await barrier`SELECT pg_advisory_xact_lock(hashtextextended(${first.address}, 46))`
+        await barrier`SELECT pg_advisory_xact_lock(hashtextextended(${second.address}, 46))`
+        for (const f of [first, second]) {
+          const attempt = predictionStore.issueNonce(
+            { matchId: f.matchId, outcome: 'HOME' },
+            f.session,
+            f.request,
+          )
+          void attempt.catch(() => {})
+          attempts.push(attempt)
+        }
+        const deadline = Date.now() + 5000
+        let waiting = 0
+        while (Date.now() < deadline) {
+          await barrier`SELECT pg_stat_clear_snapshot()`
+          const [row] = await barrier`
+            SELECT count(*)::int AS waiting FROM pg_stat_activity
+            WHERE wait_event_type = 'Lock' AND wait_event = 'advisory'
+              AND pid <> pg_backend_pid()
+              AND query ILIKE '%delete%predict_nonces%'
+          `
+          waiting = row.waiting
+          if (waiting === 2) break
+          await new Promise((resolve) => setTimeout(resolve, 10))
+        }
+        expect(waiting).toBe(2)
+      })
+      const issued = await Promise.all(attempts)
+      expect(issued).toHaveLength(2)
+      expect(issued[0].nonce).not.toBe(issued[1].nonce)
+      for (const f of [first, second]) {
+        const rows =
+          await client`SELECT * FROM predict_nonces WHERE address = ${f.address}`
+        expect(rows).toHaveLength(1)
+        expect(new Date(rows[0].expires_at).getTime()).toBeGreaterThan(
+          Date.now(),
+        )
+      }
+    } finally {
+      await Promise.allSettled(attempts)
+      await client.unsafe(
+        'DROP TRIGGER sr45_nonce_cleanup_barrier ON predict_nonces; DROP FUNCTION sr45_nonce_cleanup_barrier()',
+      )
+      await erasePredictData(first.address)
+      await erasePredictData(second.address)
+    }
+  }, 10_000)
 
   it('paginates bounded PostgreSQL match reads and exposes server-derived status and only own picks', async () => {
     const f = await pickFixture()

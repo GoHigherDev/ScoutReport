@@ -284,13 +284,15 @@ export const predictionStore: PredictionStore = {
       await assertPickEligibility(session, request, transactionEligibility(tx))
       // Per-wallet replacement bounds outstanding challenges to one. Cleanup is
       // bounded too and uses the existing primary key, not a full-table deletion.
+      await tx
+        .delete(predictNonces)
+        .where(eq(predictNonces.address, session.address))
       await tx.execute(sql`
-        DELETE FROM predict_nonces WHERE address = ${session.address}
-          OR nonce IN (
-            SELECT nonce FROM predict_nonces
-            WHERE expires_at <= clock_timestamp()
-            ORDER BY nonce LIMIT 100 FOR UPDATE SKIP LOCKED
-          )
+        DELETE FROM predict_nonces WHERE nonce IN (
+          SELECT nonce FROM predict_nonces
+          WHERE expires_at <= clock_timestamp() AND address <> ${session.address}
+          ORDER BY nonce LIMIT 100 FOR UPDATE SKIP LOCKED
+        )
       `)
       const nonce = randomBytes(32).toString('hex')
       const [row] = await tx
@@ -305,6 +307,7 @@ export const predictionStore: PredictionStore = {
     })
   },
   async submit(input, session, request, verify) {
+    const origin = requirePredictOrigin(request)
     return getDatabase().transaction(async (tx) => {
       await lockPredictWallet(tx, session.address)
       const match = await openMatch(tx, input)
@@ -325,11 +328,7 @@ export const predictionStore: PredictionStore = {
       await assertPickEligibility(session, request, transactionEligibility(tx))
       let valid: boolean
       try {
-        valid = await verify(
-          session,
-          input,
-          new URL(process.env.NEXT_PUBLIC_SITE_URL!).origin,
-        )
+        valid = await verify(session, input, origin)
       } catch {
         valid = false
       }

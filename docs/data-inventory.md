@@ -74,9 +74,10 @@ Predict challenges expire after ten minutes. Issuance replaces any outstanding
 challenge for that wallet and deletes up to 100 expired challenges, skipping
 locked rows. Successful pick submission deletes its challenge in the same
 transaction as the pick and audit insert; failed submissions roll back together.
-There is no scheduled nonce purge. Pick/challenge writers and application
-erasure share a per-wallet transaction lock before taking match locks, including
-when the wallet has no previous picks.
+There is no scheduled nonce purge. Pick/challenge writers and erasure share a
+per-wallet transaction lock before taking match locks, including when the wallet
+has no previous picks. Migration `0004_predict_wallet_serialisation.sql` adds
+that lock inside the erasure function as well, protecting direct SQL erasure.
 
 The `matches` table stores off-chain fixture metadata and lifecycle state;
 there are no chain IDs, derived contract match IDs or transaction hashes.

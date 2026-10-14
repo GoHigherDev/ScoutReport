@@ -92,7 +92,9 @@ restrict secret access, retention and backups separately.
 Migration `0003_predict_guardrails.sql` installs `erase_predict_data`, invoked
 in one transaction. The application helper first takes the same per-wallet
 transaction lock as SR-45 pick/challenge writers, so erasure also serialises
-with a wallet's first pick. The function then locks affected matches in ID order,
+with a wallet's first pick. Migration `0004_predict_wallet_serialisation.sql`
+adds the wallet lock inside the function too, protecting direct SQL callers.
+The function then locks affected matches in ID order,
 serialising with existing scoring/admin writers before scanning their committed audit rows.
 It deletes picks (including signatures), points,
 terms/18+ records, Predict nonces, wallet-linked SIWE nonces and rate-limit

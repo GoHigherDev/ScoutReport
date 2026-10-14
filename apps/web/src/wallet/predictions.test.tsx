@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -18,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   signIn: vi.fn(),
 }))
 vi.mock('wagmi', () => ({
-  useAccount: () => ({ address: mocks.wallet, isConnected: !!mocks.wallet }),
+  useConnection: () => ({ address: mocks.wallet, isConnected: !!mocks.wallet }),
 }))
 vi.mock('@wagmi/core', () => ({
   getAccount: () => ({ address: mocks.wallet }),
@@ -93,10 +94,10 @@ beforeEach(() => {
             {
               ...match,
               outcome: 'HOME',
-              points: match.status === 'voided' ? 0 : 5,
+              points: match.status === 'settled' ? 5 : 0,
             },
           ],
-          totalPoints: match.status === 'voided' ? 0 : 5,
+          totalPoints: match.status === 'settled' ? 5 : 0,
           nextCursor: null,
         })
       return Response.json({ matches: [match], nextCursor: null })
@@ -106,6 +107,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -169,6 +171,7 @@ it('reloads eligibility and matches after existing SIWE sign-in', async () => {
     await screen.findByText('First club / Second club'),
   ).toBeInTheDocument()
   expect(mocks.signIn).toHaveBeenCalledOnce()
+  expect(screen.queryByText(NAMES.predict.saved)).not.toBeInTheDocument()
   expect(
     mocks.fetch.mock.calls.filter(([path]) => path.includes('/eligibility'))
       .length,
@@ -206,6 +209,7 @@ it('requires both explicit age and current terms before allowing a signature', a
   ])
   expect(JSON.parse(writes[1][1].body)).toEqual({ version: '0.3' })
   expect(mocks.sign).not.toHaveBeenCalled()
+  expect(screen.queryByText(NAMES.predict.saved)).not.toBeInTheDocument()
 })
 
 it('blocks signing when trusted eligibility says the country is unavailable', async () => {
@@ -276,6 +280,27 @@ it('handles signature rejection without posting a pick and keeps the banner', as
   expect(await screen.findByRole('alert')).toHaveTextContent(
     NAMES.predict.rejected,
   )
+  expect(
+    mocks.fetch.mock.calls.some(([path]) => path === '/api/predict/picks'),
+  ).toBe(false)
+  expect(screen.getByText(NAMES.predict.freeToPlayBanner)).toBeInTheDocument()
+})
+
+it('does not prompt for a signature or post a pick if the challenge request fails', async () => {
+  const api = mocks.fetch.getMockImplementation()!
+  mocks.fetch.mockImplementation((path, options) =>
+    path === '/api/predict/nonce'
+      ? Promise.resolve(
+          Response.json({ message: NAMES.predict.error }, { status: 503 }),
+        )
+      : api(path, options),
+  )
+  setup()
+  await sign()
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    NAMES.predict.error,
+  )
+  expect(mocks.sign).not.toHaveBeenCalled()
   expect(
     mocks.fetch.mock.calls.some(([path]) => path === '/api/predict/picks'),
   ).toBe(false)
@@ -366,19 +391,118 @@ it.each(['locked', 'settled', 'voided'] as const)(
 )
 
 it('updates an upcoming match locally at the lock boundary without polling paid APIs', async () => {
-  match.lockTime = new Date(Date.now() + 250).toISOString()
+  vi.useFakeTimers()
+  const now = new Date('2030-01-01T00:00:00.000Z')
+  vi.setSystemTime(now)
+  match.lockTime = new Date(now.getTime() + 10_000).toISOString()
   setup()
+  for (let flush = 0; flush < 8; flush++)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+  expect(
+    screen.getByRole('button', {
+      name: `${NAMES.predict.signPick}: HOME`,
+    }),
+  ).toBeEnabled()
+  const calls = mocks.fetch.mock.calls.length
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(
+      Date.parse(match.lockTime) - Date.now() - 1,
+    )
+  })
+  expect(screen.queryByText(NAMES.predict.locked)).not.toBeInTheDocument()
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1)
+  })
+  expect(screen.getByText(NAMES.predict.locked)).toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: `${NAMES.predict.signPick}: HOME` }),
+  ).not.toBeInTheDocument()
+  expect(mocks.fetch).toHaveBeenCalledTimes(calls)
+})
+
+it('does not leak selected eligibility checkboxes to a switched wallet', async () => {
+  eligibility!.ageConfirmed = false
+  eligibility!.termsAccepted = false
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  })
+  const element = () => (
+    <QueryClientProvider client={client}>
+      <PredictPage />
+    </QueryClientProvider>
+  )
+  const result = render(element())
+  fireEvent.click(await screen.findByLabelText(NAMES.predict.confirmAge))
+  fireEvent.click(screen.getByLabelText(NAMES.predict.acceptTerms))
+  expect(
+    screen.getByRole('button', { name: NAMES.predict.continue }),
+  ).toBeEnabled()
+  mocks.wallet = '0x00000000000000000000000000000000000000cd'
+  eligibility!.address = mocks.wallet
+  result.rerender(element())
+  expect(
+    await screen.findByLabelText(NAMES.predict.confirmAge),
+  ).not.toBeChecked()
+  expect(screen.getByLabelText(NAMES.predict.acceptTerms)).not.toBeChecked()
+  expect(
+    screen.getByRole('button', { name: NAMES.predict.continue }),
+  ).toBeDisabled()
+})
+
+it('does not leak a pending signing state to a new wallet', async () => {
+  let resolve!: (signature: string) => void
+  mocks.sign.mockImplementation(
+    () =>
+      new Promise<string>((done) => {
+        resolve = done
+      }),
+  )
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  })
+  const element = () => (
+    <QueryClientProvider client={client}>
+      <PredictPage />
+    </QueryClientProvider>
+  )
+  const result = render(element())
+  await sign()
+  await waitFor(() => expect(mocks.sign).toHaveBeenCalledOnce())
+  mocks.wallet = '0x00000000000000000000000000000000000000cd'
+  eligibility!.address = mocks.wallet
+  result.rerender(element())
   expect(
     await screen.findByRole('button', {
       name: `${NAMES.predict.signPick}: HOME`,
     }),
   ).toBeEnabled()
-  const calls = mocks.fetch.mock.calls.length
-  expect(await screen.findByText(NAMES.predict.locked)).toBeInTheDocument()
+  expect(screen.queryByText(NAMES.predict.signing)).not.toBeInTheDocument()
+  resolve('0x1234')
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: `${NAMES.predict.signPick}: HOME` }),
+    ).toBeEnabled(),
+  )
   expect(
-    screen.queryByRole('button', { name: `${NAMES.predict.signPick}: HOME` }),
-  ).not.toBeInTheDocument()
-  expect(mocks.fetch).toHaveBeenCalledTimes(calls)
+    mocks.fetch.mock.calls.some(([path]) => path === '/api/predict/picks'),
+  ).toBe(false)
+})
+
+it('shows centralised retry guidance and Retry-After for rate-limited requests', async () => {
+  pickFailure = Response.json(
+    { message: 'Too many requests' },
+    {
+      status: 429,
+      headers: { 'Retry-After': '30' },
+    },
+  )
+  setup()
+  await sign()
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    `${NAMES.predict.rateLimited} ${NAMES.predict.retryAfter}: 30.`,
+  )
 })
 
 it('rejects a pending signature even if the wallet switches away and back', async () => {
@@ -440,5 +564,30 @@ it.each(['settled', 'voided'] as const)(
           : `${NAMES.predict.voidReason}: Fixture abandoned`,
       ),
     ).toBeInTheDocument()
+    if (status === 'voided')
+      expect(
+        screen.getByText(`${NAMES.predict.result}: ${NAMES.predict.voided}`),
+      ).toBeInTheDocument()
+  },
+)
+
+it.each(['upcoming', 'locked'] as const)(
+  'shows outcome, pending result and zero credited points on My tab for %s',
+  async (status) => {
+    match.status = status
+    setup()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'My [PREDICTIONS_TAB_NAME]' }),
+    )
+    expect(
+      await screen.findByText(`${NAMES.predict.yourPick}: HOME`),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        `${NAMES.predict.result}: ${NAMES.predict.resultPending}`,
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText(`${NAMES.predict.points}: 0`)).toBeInTheDocument()
+    expect(screen.getByText(NAMES.predict.freeToPlayBanner)).toBeInTheDocument()
   },
 )
