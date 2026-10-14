@@ -283,7 +283,10 @@ describe('Predict erasure entry point', () => {
     } as unknown as ReturnType<typeof getDatabase>)
     await erasePredictData(address.toUpperCase().replace('0X', '0x'))
     expect(transaction).toHaveBeenCalledTimes(1)
-    const query = new PgDialect().sqlToQuery(execute.mock.calls[0][0])
+    const lock = new PgDialect().sqlToQuery(execute.mock.calls[0][0])
+    expect(lock.sql).toContain('pg_advisory_xact_lock')
+    expect(lock.params).toEqual([address])
+    const query = new PgDialect().sqlToQuery(execute.mock.calls[1][0])
     expect(query.sql).toContain('erase_predict_data')
     expect(query.params[0]).toBe(address)
     expect(query.params[1]).toMatch(/^erased:[0-9a-f]{64}$/)
@@ -305,7 +308,7 @@ describe('no prize or redeemable-value path', () => {
     for (const file of files) {
       const source = readFileSync(new URL(file, server), 'utf8')
       expect(source).not.toMatch(
-        /(?:FEATURE_[A-Z_]*(?:PRIZE|REWARD|REDEEM)|(?:enable|claim|redeem|award|transfer|pay)(?:Prize|Reward|Points)|@scoutreport\/chain|(?:getBalance|balanceOf|pointsOf)\s*\()/,
+        /(?:FEATURE_[A-Z_]*(?:PRIZE|REWARD|REDEEM)|(?:enable|claim|redeem|award|transfer|pay)(?:Prize|Reward|Points)|(?:getBalance|balanceOf|pointsOf|readContract)\s*\()/,
       )
     }
     const src = new URL('../', import.meta.url)

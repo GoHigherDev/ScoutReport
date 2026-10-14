@@ -10,6 +10,12 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createPredictAcceptanceRoutes, erasePredictData } from './predict'
 import { PREDICT_TERMS_VERSION } from './predict-config'
 import { readSession } from './session'
+import { pickTypedData } from '../lib/predict'
+import {
+  createPredictionRoutes,
+  predictionStore,
+  verifyPickSignature,
+} from './predictions'
 
 vi.mock('server-only', () => ({}))
 const url = process.env.PREDICT_TEST_DATABASE_URL
@@ -335,6 +341,405 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     } finally {
       await client`DELETE FROM predict_rate_limits WHERE address = ANY(${[...expired, recent, active]}::text[])`
       await erasePredictData(address)
+    }
+  })
+
+  async function pickFixture() {
+    const account = privateKeyToAccount(generatePrivateKey())
+    const address = account.address.toLowerCase()
+    const creator =
+      privateKeyToAccount(generatePrivateKey()).address.toLowerCase()
+    const matchId = randomUUID()
+    await client`
+      INSERT INTO matches (id, sport, home_label, away_label, kickoff_utc, lock_at_utc, outcomes, points_for_correct, created_by)
+      VALUES (${matchId}, 'football', 'SR-45 first', 'SR-45 second', clock_timestamp() + interval '1 day',
+        clock_timestamp() + interval '1 hour', '["HOME","AWAY"]', 5, ${creator})
+    `
+    const session = {
+      address,
+      chainId: 88882 as const,
+      isContract: false,
+      issuedAt: Date.now(),
+    }
+    const request = new Request(`${origin}/api/predict/picks`, {
+      method: 'POST',
+      headers: { Origin: origin, 'x-vercel-ip-country': 'ES' },
+    })
+    await client`INSERT INTO predict_age_confirmations (address) VALUES (${address})`
+    await client`INSERT INTO predict_terms_acceptances (address, version, country, country_check)
+      VALUES (${address}, ${PREDICT_TERMS_VERSION}, 'ES', 'allowed')`
+    async function signed(outcome = 'HOME') {
+      const selection = { matchId, outcome }
+      const { nonce } = await predictionStore.issueNonce(
+        selection,
+        session,
+        request,
+      )
+      const message = { ...selection, nonce }
+      const signature = await account.signTypedData(
+        pickTypedData(origin, session.chainId, message),
+      )
+      return { ...message, signature }
+    }
+    return { account, address, matchId, session, request, signed }
+  }
+
+  it('stores real EIP-712 signatures on picks and append-only audit, changes picks, and rejects atomic replay', async () => {
+    const f = await pickFixture()
+    const first = await f.signed()
+    await predictionStore.submit(
+      first,
+      f.session,
+      f.request,
+      verifyPickSignature,
+    )
+    const second = await f.signed('AWAY')
+    const attempts = await Promise.allSettled([
+      predictionStore.submit(second, f.session, f.request, verifyPickSignature),
+      predictionStore.submit(second, f.session, f.request, verifyPickSignature),
+    ])
+    expect(
+      attempts.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1)
+    const [pick] =
+      await client`SELECT * FROM picks WHERE address = ${f.address}`
+    expect(pick.outcome).toBe('AWAY')
+    expect(pick.signature).toBe(second.signature)
+    const audit =
+      await client`SELECT * FROM prediction_audit WHERE address = ${f.address} ORDER BY created_at`
+    expect(audit.map((row) => row.signature)).toEqual([
+      first.signature,
+      second.signature,
+    ])
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    await erasePredictData(f.address)
+    expect(
+      await client`SELECT * FROM picks WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    const erased =
+      await client`SELECT * FROM prediction_audit WHERE match_id = ${f.matchId}`
+    expect(
+      erased.every(
+        (row) => row.signature === null && row.address.startsWith('erased:'),
+      ),
+    ).toBe(true)
+  })
+
+  it('rolls back nonce consumption, pick and audit on invalid signatures or audit failure', async () => {
+    const f = await pickFixture()
+    const pick = await f.signed()
+    const wrong = privateKeyToAccount(generatePrivateKey())
+    const invalid = {
+      ...pick,
+      signature: await wrong.signTypedData(pickTypedData(origin, 88882, pick)),
+    }
+    await expect(
+      predictionStore.submit(
+        invalid,
+        f.session,
+        f.request,
+        verifyPickSignature,
+      ),
+    ).rejects.toMatchObject({ status: 400 })
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE nonce = ${pick.nonce}`,
+    ).toHaveLength(1)
+    expect(
+      await client`SELECT * FROM picks WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    await client.unsafe(`
+      CREATE FUNCTION sr45_test_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'SR-45 test audit failure'; END; $$;
+      CREATE TRIGGER sr45_test_audit_failure BEFORE INSERT ON prediction_audit
+      FOR EACH ROW EXECUTE FUNCTION sr45_test_audit_failure();
+    `)
+    try {
+      await expect(
+        predictionStore.submit(pick, f.session, f.request, verifyPickSignature),
+      ).rejects.toMatchObject({
+        cause: { message: 'SR-45 test audit failure' },
+      })
+      expect(
+        await client`SELECT * FROM predict_nonces WHERE nonce = ${pick.nonce}`,
+      ).toHaveLength(1)
+      expect(
+        await client`SELECT * FROM picks WHERE address = ${f.address}`,
+      ).toHaveLength(0)
+      expect(
+        await client`SELECT * FROM prediction_audit WHERE address = ${f.address}`,
+      ).toHaveLength(0)
+    } finally {
+      await client.unsafe(
+        'DROP TRIGGER sr45_test_audit_failure ON prediction_audit; DROP FUNCTION sr45_test_audit_failure()',
+      )
+    }
+    await predictionStore.submit(
+      pick,
+      f.session,
+      f.request,
+      verifyPickSignature,
+    )
+    await erasePredictData(f.address)
+  })
+
+  it('rejects expired/replaced challenges and a locked match using database time, not browser time', async () => {
+    const f = await pickFixture()
+    const first = await f.signed()
+    const second = await f.signed('AWAY')
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE address = ${f.address}`,
+    ).toHaveLength(1)
+    await expect(
+      predictionStore.submit(first, f.session, f.request, verifyPickSignature),
+    ).rejects.toMatchObject({ status: 409 })
+    await client`UPDATE predict_nonces SET expires_at = clock_timestamp() WHERE nonce = ${second.nonce}`
+    await expect(
+      predictionStore.submit(second, f.session, f.request, verifyPickSignature),
+    ).rejects.toMatchObject({ status: 409 })
+    const third = await f.signed()
+    await client`UPDATE matches SET lock_at_utc = clock_timestamp() WHERE id = ${f.matchId}`
+    await expect(
+      predictionStore.submit(third, f.session, f.request, verifyPickSignature),
+    ).rejects.toMatchObject({ status: 409 })
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE nonce = ${third.nonce}`,
+    ).toHaveLength(1)
+    expect(
+      await client`SELECT * FROM picks WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    await erasePredictData(f.address)
+  })
+
+  it('rechecks the deadline after verification before recording server timestamps', async () => {
+    const f = await pickFixture()
+    const pick = await f.signed()
+    await client`UPDATE matches SET lock_at_utc = clock_timestamp() + interval '100 milliseconds' WHERE id = ${f.matchId}`
+    const slowVerifier = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      return true
+    }
+    await expect(
+      predictionStore.submit(pick, f.session, f.request, slowVerifier),
+    ).rejects.toMatchObject({ status: 409 })
+    expect(
+      await client`SELECT * FROM picks WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE nonce = ${pick.nonce}`,
+    ).toHaveLength(1)
+    await erasePredictData(f.address)
+  })
+
+  async function waitForBlockedQuery(
+    locker: postgres.TransactionSql,
+    fragment: string,
+  ) {
+    const deadline = Date.now() + 5000
+    while (Date.now() < deadline) {
+      await locker`SELECT pg_stat_clear_snapshot()`
+      const [row] = await locker`
+        SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+          WHERE wait_event_type = 'Lock' AND pid <> pg_backend_pid()
+            AND query ILIKE ${`%${fragment}%`}) AS waiting
+      `
+      if (row.waiting) return
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+    throw new Error(`No blocked ${fragment} query`)
+  }
+
+  it('rechecks current eligibility AFTER the match lock and rolls back challenge consumption', async () => {
+    const f = await pickFixture()
+    const pick = await f.signed()
+    let attempt!: Promise<unknown>
+    await client.begin(async (locker) => {
+      await locker`SELECT id FROM matches WHERE id = ${f.matchId} FOR UPDATE`
+      attempt = predictionStore.submit(
+        pick,
+        f.session,
+        f.request,
+        verifyPickSignature,
+      )
+      // Attach rejection handler before releasing the competing transaction.
+      void attempt.catch(() => {})
+      await waitForBlockedQuery(locker, 'matches')
+      await locker`DELETE FROM predict_terms_acceptances WHERE address = ${f.address}`
+    })
+    await expect(attempt).rejects.toMatchObject({ status: 403 })
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE nonce = ${pick.nonce}`,
+    ).toHaveLength(1)
+    expect(
+      await client`SELECT * FROM picks WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    await erasePredictData(f.address)
+  }, 10_000)
+
+  it('serialises erasure with a first pick even when erasure cannot initially see its match', async () => {
+    const f = await pickFixture()
+    const pick = await f.signed()
+    let attempt!: Promise<unknown>
+    let erasure!: Promise<void>
+    await client.begin(async (locker) => {
+      await locker`SELECT id FROM matches WHERE id = ${f.matchId} FOR UPDATE`
+      attempt = predictionStore.submit(
+        pick,
+        f.session,
+        f.request,
+        verifyPickSignature,
+      )
+      await waitForBlockedQuery(locker, 'matches')
+      erasure = erasePredictData(f.address)
+      await waitForBlockedQuery(locker, 'pg_advisory_xact_lock')
+    })
+    await attempt
+    await erasure
+    expect(
+      await client`SELECT * FROM picks WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    const audit =
+      await client`SELECT * FROM prediction_audit WHERE match_id = ${f.matchId}`
+    expect(audit).toHaveLength(1)
+    expect(audit[0].signature).toBeNull()
+    expect(audit[0].address).toMatch(/^erased:/)
+    await expect(
+      predictionStore.submit(pick, f.session, f.request, verifyPickSignature),
+    ).rejects.toMatchObject({ status: 409 })
+  }, 10_000)
+
+  it('uses a real SIWE session and shared limiter for routes, and exposes own points including voids', async () => {
+    const f = await pickFixture()
+    const authenticated = await authenticatedRequest(f.address)
+    const routes = createPredictionRoutes()
+    const pick = await f.signed()
+    expect((await routes.pick(authenticated(pick))).status).toBe(200)
+    const [saved] =
+      await client`SELECT updated_at FROM picks WHERE address = ${f.address}`
+    const [match] =
+      await client`SELECT lock_at_utc FROM matches WHERE id = ${f.matchId}`
+    expect(new Date(saved.updated_at).getTime()).toBeLessThan(
+      new Date(match.lock_at_utc).getTime(),
+    )
+    await client`UPDATE matches SET status = 'settled', result = 'HOME' WHERE id = ${f.matchId}`
+    await client`INSERT INTO prediction_points (match_id, address, points, week_start_utc, season_id)
+      VALUES (${f.matchId}, ${f.address}, 5, now(), 'test')`
+    const mine = await (await routes.mine(authenticated({}))).json()
+    expect(mine).toMatchObject({
+      totalPoints: 5,
+      matches: [
+        expect.objectContaining({
+          id: f.matchId,
+          outcome: 'HOME',
+          result: 'HOME',
+          points: 5,
+          status: 'settled',
+        }),
+      ],
+    })
+    await client`UPDATE matches SET status = 'voided', result = NULL, void_reason = 'Abandoned' WHERE id = ${f.matchId}`
+    const voided = await (await routes.mine(authenticated({}))).json()
+    expect(voided).toMatchObject({
+      totalPoints: 0,
+      matches: [
+        expect.objectContaining({
+          status: 'voided',
+          points: 0,
+          voidReason: 'Abandoned',
+        }),
+      ],
+    })
+    const [limit] =
+      await client`SELECT count FROM predict_rate_limits WHERE address = ${f.address}`
+    expect(limit.count).toBe(3)
+    const other =
+      privateKeyToAccount(generatePrivateKey()).address.toLowerCase()
+    expect((await predictionStore.mine(other, null)).matches).toHaveLength(0)
+    await erasePredictData(f.address)
+  })
+
+  it('bounds challenge retention and removes no more than 100 expired challenges per issuance', async () => {
+    const f = await pickFixture()
+    const expired = Array.from({ length: 105 }, () =>
+      randomBytes(32).toString('hex'),
+    )
+    await client`INSERT INTO predict_nonces (nonce, address, expires_at)
+      SELECT unnest(${expired}::text[]), ${privateKeyToAccount(generatePrivateKey()).address.toLowerCase()}, now() - interval '1 hour'`
+    await f.signed()
+    const remaining =
+      await client`SELECT nonce FROM predict_nonces WHERE nonce = ANY(${expired}::text[])`
+    expect(remaining).toHaveLength(5)
+    await f.signed()
+    expect(
+      await client`SELECT nonce FROM predict_nonces WHERE address = ${f.address}`,
+    ).toHaveLength(1)
+    await client`DELETE FROM predict_nonces WHERE nonce = ANY(${expired}::text[])`
+    await erasePredictData(f.address)
+  })
+
+  it('paginates bounded PostgreSQL match reads and exposes server-derived status and only own picks', async () => {
+    const f = await pickFixture()
+    const pick = await f.signed()
+    await predictionStore.submit(
+      pick,
+      f.session,
+      f.request,
+      verifyPickSignature,
+    )
+    const rows = await predictionStore.list(f.address, null)
+    expect(rows.matches.length).toBeLessThanOrEqual(50)
+    // Read just this fixture using a timestamp cursor immediately before it.
+    const [fixture] =
+      await client`SELECT kickoff_utc FROM matches WHERE id = ${f.matchId}`
+    const cursor = {
+      kickoff: new Date(
+        new Date(fixture.kickoff_utc).getTime() - 1,
+      ).toISOString(),
+      id: randomUUID(),
+    }
+    expect(
+      (await predictionStore.list(f.address, cursor)).matches.find(
+        (match) => match.id === f.matchId,
+      ),
+    ).toMatchObject({ status: 'upcoming', outcome: 'HOME' })
+    await client`UPDATE matches SET lock_at_utc = clock_timestamp() WHERE id = ${f.matchId}`
+    expect(
+      (await predictionStore.list(f.address, cursor)).matches.find(
+        (match) => match.id === f.matchId,
+      ),
+    ).toMatchObject({ status: 'locked' })
+    const other =
+      privateKeyToAccount(generatePrivateKey()).address.toLowerCase()
+    expect(
+      (await predictionStore.list(other, cursor)).matches.find(
+        (match) => match.id === f.matchId,
+      )?.outcome,
+    ).toBeNull()
+    const ids = Array.from({ length: 55 }, () => randomUUID())
+    await client`INSERT INTO matches (id, sport, home_label, away_label, kickoff_utc, lock_at_utc, outcomes, points_for_correct, created_by)
+      SELECT unnest(${ids}::uuid[]), 'football', 'Paged first', 'Paged second',
+        '2060-01-01'::timestamptz, '2060-01-01'::timestamptz, '["HOME","AWAY"]'::jsonb, 5, ${other}`
+    try {
+      const first = await predictionStore.list(f.address, {
+        kickoff: '2059-01-01T00:00:00.000Z',
+        id: randomUUID(),
+      })
+      expect(first.matches).toHaveLength(50)
+      const [kickoff, id] = first.nextCursor!.split(',')
+      const second = await predictionStore.list(f.address, { kickoff, id })
+      expect(second.matches).toHaveLength(5)
+      expect(second.nextCursor).toBeNull()
+      expect(
+        new Set([...first.matches, ...second.matches].map((match) => match.id))
+          .size,
+      ).toBe(55)
+    } finally {
+      await client`DELETE FROM matches WHERE id = ANY(${ids}::uuid[])`
+      await erasePredictData(f.address)
     }
   })
 })

@@ -44,7 +44,7 @@ collected in production. Expiry timestamps alone do not delete rows.
 | `matches.created_by` / lifecycle fields                         | Admin wallet and UTC create/update/settle/void timestamps                              | Same as match row                                                 |
 | `picks.match_id` / `address`                                    | One current pick per wallet and match                                                  | Follows SR-41 retention and erasure                               |
 | `picks.outcome`                                                 | The wallet's selected match outcome                                                    | Same as pick row                                                  |
-| `picks.signature`                                               | Nullable EIP-712 signature slot; SR-45 owns submission/persistence                     | Deleted with the pick on erasure                                  |
+| `picks.signature`                                               | Verified EIP-712 signature for the current pick or change                               | Deleted with the pick on erasure                                  |
 | `picks.created_at` / `updated_at`                               | Server timestamps used to enforce lock and scoring eligibility                         | Same as pick row                                                  |
 | `prediction_points.match_id` / `address`                        | Match and wallet key for idempotently calculated points                                | Follows SR-41 retention and erasure                               |
 | `prediction_points.points`                                      | Points for a correct pick; wrong picks have no score row                               | Same as score row                                                 |
@@ -58,23 +58,32 @@ collected in production. Expiry timestamps alone do not delete rows.
 | `predict_age_confirmations.address` / `confirmed_at`            | Wallet's positive 18+ self-confirmation and UTC time; no date of birth                 | Until Predict erasure; approved retention pending                 |
 | `predict_terms_acceptances.address` / `version` / `accepted_at` | Wallet, terms version and first UTC acceptance time                                    | Until Predict erasure; approved retention pending                 |
 | `predict_terms_acceptances.country` / `country_check`           | Trusted platform country code or null, and allowed/unknown result; never raw IP        | Same as acceptance row                                            |
-| `predict_nonces.nonce` / `address` / `expires_at`               | Wallet-linked replay-protection storage for SR-45                                      | Until Predict erasure; expiry is not automatic deletion           |
-| `predict_rate_limits.address` / `count` / `expires_at`          | Shared authenticated acceptance limit; count resets after a minute on the next request | Erasure or opportunistic cleanup; see policy below                |
-| `prediction_audit.id` / `match_id` / `outcome` / `created_at`   | Pick event metadata; SR-45 owns event insertion                                        | Retained after erasure; approved retention pending                |
+| `predict_nonces.nonce` / `address` / `expires_at`               | Wallet-linked single-use EIP-712 replay protection                                      | Deleted on successful pick submission, cleanup or Predict erasure |
+| `predict_rate_limits.address` / `count` / `expires_at`          | Shared authenticated Predict limit; count resets after a minute on the next request    | Erasure or opportunistic cleanup; see policy below                |
+| `prediction_audit.id` / `match_id` / `outcome` / `created_at`   | Append-only event for each accepted pick and change                                    | Retained after erasure; approved retention pending                |
 | `prediction_audit.address` / `signature`                        | Wallet and nullable EIP-712 signature                                                  | Erasure replaces address with keyed pseudonym and nulls signature |
 
-Each eligible authenticated acceptance request opportunistically deletes up to
-100 other rate-limit rows expired for over an hour, oldest first, skipping locked
+Each authenticated Predict request using the shared limiter opportunistically
+deletes up to 100 other rate-limit rows expired for over an hour, oldest first, skipping locked
 rows. Active/recent limits remain; the current wallet is excluded and its counter
 is reset on expiry. No scheduled TTL exists: cleanup depends on traffic and rows
 can remain longer when there is no traffic, a backlog or a lock. Wallet erasure
 also removes its rate-limit row.
 
+Predict challenges expire after ten minutes. Issuance replaces any outstanding
+challenge for that wallet and deletes up to 100 expired challenges, skipping
+locked rows. Successful pick submission deletes its challenge in the same
+transaction as the pick and audit insert; failed submissions roll back together.
+There is no scheduled nonce purge. Pick/challenge writers and application
+erasure share a per-wallet transaction lock before taking match locks, including
+when the wallet has no previous picks.
+
 The `matches` table stores off-chain fixture metadata and lifecycle state;
 there are no chain IDs, derived contract match IDs or transaction hashes.
 SR-41 adds nullable signature storage, a wallet-linked nonce table and a Predict
-audit table; SR-45 owns submission, signature verification and event insertion.
-The intended Predict record includes the wallet
+audit table; SR-45 implements submission, signature verification and event
+insertion.
+The Predict record includes the wallet
 address, pick, EIP-712 signature and timestamps in Postgres. Picks use a free
 wallet signature, with no gas or on-chain submission. They support submission
 verification, deadline enforcement and scoring. The lawful basis is pending
@@ -83,7 +92,7 @@ legal review; the draft retention value is `LEGAL_DETAILS.retention` in
 to be anonymised after 24 months; other retention periods remain unconfirmed.
 The Predict audit log is append-only except for erasure. `erasePredictData`
 deletes picks, points, terms/18+ records, wallet-linked Predict/SIWE nonces and
-acceptance rate-limit rows in one transaction. Audit signatures are removed;
+Predict rate-limit rows in one transaction. Audit signatures are removed;
 audit wallet columns and fixture admin-wallet metadata are pseudonymised with
 HMAC-SHA-256 using restricted server-only `PREDICT_ERASURE_SECRET` (required, at
 least 32 characters, held in deployment secret management with access limited to
@@ -91,11 +100,17 @@ authorised erasure operators, never exposed in client bundles/logs or committed)
 Identifying admin audit payloads are redacted
 entirely, including signature copies and mixed-case wallet references.
 Retained keyed pseudonyms are not claimed to be anonymous.
-The acceptance endpoints require SIWE, same Origin and a shared Postgres rate
-limit before acceptance work. Terms records include country code/result from
+Predict endpoints require SIWE before database/RPC work and use a shared
+Postgres per-account rate limit. Writes require the same Origin. Each pick and
+change is checked against SR-41 eligibility and the server's lock deadline;
+the current pick and signed audit event are saved atomically with nonce
+consumption.
+Read APIs return matches and the session wallet's picks/results/points, never
+stored signatures or other wallets' picks. Terms records include country
+code/result from
 the trusted platform, never client country or raw IP. Unknown countries fail
 closed in production. These processing/retention policies remain draft; no
-automatic anonymisation or submission route is added. See
+automatic aggregate anonymisation is added. See
 [Predict guardrails](legal/predictions-guardrails.md) and
 [DPIA screening](legal/predict-dpia-screening.md).
 `prediction_points` is replaced by the

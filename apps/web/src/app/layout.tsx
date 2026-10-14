@@ -81,9 +81,9 @@ export default function RootLayout({
                 >
                   {NAMES.nav.leaderboards}
                 </a>
-                <a className="rounded-sm hover:text-sr-text" href="#predict">
+                <Link className="rounded-sm hover:text-sr-text" href="/predict">
                   {NAMES.nav.predict}
-                </a>
+                </Link>
                 <Link
                   className="rounded-sm hover:text-sr-text"
                   href="/optimiser"

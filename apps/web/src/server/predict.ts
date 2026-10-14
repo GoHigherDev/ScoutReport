@@ -100,7 +100,7 @@ export async function assertPickEligibility(
   }
 }
 
-function requirePredictOrigin(request: Request) {
+export function requirePredictOrigin(request: Request) {
   const configured = process.env.NEXT_PUBLIC_SITE_URL
   if (!configured) throw new Error('NEXT_PUBLIC_SITE_URL is required')
   const url = new URL(configured)
@@ -174,7 +174,7 @@ export function createPredictAcceptanceRoutes(
   }
 }
 
-const predictAcceptanceLimiter: RateLimiter = {
+export const predictAcceptanceLimiter: RateLimiter = {
   async consume(address) {
     const rows = await getDatabase().execute<{
       count: number
@@ -221,8 +221,17 @@ export async function erasePredictData(
   }
   const pseudonym = `erased:${createHmac('sha256', secret).update(stored).digest('hex')}`
   const erase = async (tx: DbTransaction) => {
+    await lockPredictWallet(tx, stored)
     await tx.execute(sql`SELECT erase_predict_data(${stored}, ${pseudonym})`)
   }
+
   if (transaction) await erase(transaction)
   else await getDatabase().transaction(erase)
+}
+
+// Serialise first picks with erasure, which otherwise cannot see their match.
+export async function lockPredictWallet(tx: DbTransaction, address: string) {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${address}, 45))`,
+  )
 }
