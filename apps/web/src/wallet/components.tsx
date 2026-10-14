@@ -14,6 +14,7 @@ import {
 import { NAMES } from '../copy/names'
 import { useWalletModal } from './providers'
 import { useHoldings } from './hooks'
+import { SignInButton } from './sign-in-button'
 
 export function NetworkBadge() {
   const { chainId, isConnected } = useConnection()
@@ -69,6 +70,7 @@ export function WalletButton() {
           {isConnected ? NAMES.wallet.disconnect : NAMES.connectWallet}
         </Button>
       </div>
+      {isConnected && address && <SignInButton key={address} />}
       {!available && !isConnected && (
         <p className="mt-2 max-w-xs text-xs text-sr-muted">
           {NAMES.wallet.unavailable}

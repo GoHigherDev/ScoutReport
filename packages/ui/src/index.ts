@@ -1,5 +1,7 @@
 export { Button } from './button'
 export type { ButtonProps } from './button'
+export { TxButton } from './tx-button'
+export type { TxButtonProps, TxState } from './tx-button'
 export { brandTokens } from './tokens'
 export { RpCaveat } from './rp-caveat'
 export type { RpCaveatProps } from './rp-caveat'

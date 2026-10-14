@@ -8,6 +8,13 @@ export {
   isSupportedChainId,
 } from './networks.ts'
 export { getPublicClient, getStakingLogClient } from './clients.ts'
+export { checkTxGuard, useTxGuard } from './tx-guard.ts'
+export type {
+  GuardedTxRequest,
+  TxGuardOptions,
+  TxGuardResult,
+} from './tx-guard.ts'
+export { decodeTxError, SCOUTREPORT_ABIS } from './tx-errors.ts'
 export {
   DEPLOYMENT_ADDRESSES,
   readDeploymentAddresses,

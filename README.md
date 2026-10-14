@@ -379,6 +379,44 @@ key holder. `packages/contracts/deployments/88882.json` contains null
 placeholders, not deployed addresses. The existing Mainnet reader remains
 unchanged and does not silently fall back to mocks.
 
+## Transaction gas guardrails (SR-18)
+
+`@scoutreport/chain` exports `useTxGuard(request, { getWallet })`. Call the
+returned asynchronous guard immediately before writing. It checks the current
+wallet against APP_CHAIN, reads native CHZ balance and estimates gas and fees.
+It returns `{ ok: true }` or `{ ok: false, reason }`, where reason is
+`insufficient_gas`, `wrong_network` or `unknown`. Insufficient balance includes
+transaction value and the gas fee ceiling. Tests inject mock clients; they do
+not use live RPC or send Mainnet transactions.
+
+`@scoutreport/ui` exports `TxButton` with injected guard, write, receipt,
+explorer and safe-error callbacks and application-supplied labels.
+Web writes should use `TransactionButton` in `apps/web/src/wallet/tx-button.tsx`
+with the same encoded viem request that will be sent. It supplies the guard,
+APP_CHAIN client, F-04 explorer helper, `NAMES.gas` copy and gas panel.
+Use `encodeFunctionData` with the generated contract ABI rather than building
+calldata by hand. Give the component a new React `key` for a new transaction;
+after a hash is submitted, it prevents accidental resubmission even if receipt
+monitoring fails. Check the explorer in that case. Estimates can change and
+wallet fee edits remain subject to wallet approval.
+
+The gas panel shows the configured, verified faucets only on Spicy. Mainnet
+has neutral CHZ gas guidance with no purchase links. Connected wallets also
+see the approved no-gas/no-funds statement before SIWE signing.
+`decodeTxError` decodes ScoutReport ABI custom errors, including nested viem
+causes, using application-supplied messages and a generic fallback.
+Regenerate `packages/chain/abis/ScoutReportPredictions.json` from the
+contract when its ABI changes:
+
+```sh
+cd packages/contracts
+forge inspect ScoutReportPredictions abi --json > ../chain/abis/ScoutReportPredictions.json
+```
+
+See [ADR 0002](docs/adr/0002-gas-sponsorship.md): paymaster and account
+abstraction are **LATER**, subject to re-checking current Chiliz/Biconomy
+guidance.
+
 ## Repository map
 
 | Path                 | Purpose                                               |
