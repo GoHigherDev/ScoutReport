@@ -3,7 +3,13 @@
 import { useState } from 'react'
 import { useConnection, useDisconnect, useConnectorClient } from 'wagmi'
 import { createWalletClient, custom } from 'viem'
-import { Badge, Banner, Button, Skeleton } from '@scoutreport/ui'
+import {
+  AddressDisplay,
+  Badge,
+  Banner,
+  Button,
+  Skeleton,
+} from '@scoutreport/ui'
 import {
   ChainSwitchRejectedError,
   chiliz,
@@ -57,9 +63,7 @@ export function WalletButton() {
       <div className="flex flex-wrap items-center gap-2">
         <NetworkBadge />
         {isConnected && address && (
-          <span title={address}>
-            {address.slice(0, 6)}…{address.slice(-4)}
-          </span>
+          <AddressDisplay address={address} showFullAddressTitle />
         )}
         <Button
           type="button"

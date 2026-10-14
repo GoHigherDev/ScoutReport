@@ -14,8 +14,9 @@ SIWE enforces single use and a ten-minute nonce expiry; new nonce issuance delet
 including consumed rows. There is no scheduled deletion or automatic database
 TTL, so expired rows remain until another nonce is issued. The following
 retention descriptions document actual behaviour, not an approved production
-retention policy. F-12 must define and implement
-production retention, erasure and backup disposal before personal data is
+retention policy. SR-17 / F-12 drafts the notice and erasure contract; SR-23
+implements erasure. Approved production retention and backup disposal are
+still required before personal data is
 collected in production. Expiry timestamps alone do not delete rows.
 
 | Table / field                                    | Purpose                                                               | Current retention                                     |
@@ -55,8 +56,23 @@ collected in production. Expiry timestamps alone do not delete rows.
 
 The `matches` table stores off-chain fixture metadata and lifecycle state;
 there are no chain IDs, derived contract match IDs or transaction hashes.
-`picks` stores the current pick for each wallet/match without signatures or
-nonces; SR-45 owns those fields. `prediction_points` is replaced by the
+`picks` currently stores the current pick for each wallet/match without signatures or
+nonces; SR-45 owns those fields. The intended Predict record includes the wallet
+address, pick, EIP-712 signature and timestamps in Postgres. Picks use a free
+wallet signature, with no gas or on-chain submission. They support submission
+verification, deadline enforcement and scoring. The lawful basis is pending
+legal review; the draft retention value is `LEGAL_DETAILS.retention` in
+`apps/web/src/copy/names.ts`. The revised draft policy requires Predict aggregates
+to be anonymised after 24 months; other retention periods remain unconfirmed.
+The intended append-only Predict audit log records picks and signatures for
+accountability. Erasure deletes picks, terms-acceptance records and stored
+signatures, and pseudonymises audit-log entries, which are kept.
+The terms-acceptance record contains wallet address, terms version, UTC time,
+country-check result. The IP country check is done on our server; raw IP is not
+stored. These are draft processing requirements, not claims that the current
+schema implements signature persistence, a Predict audit log, terms acceptance,
+country checking, anonymisation or erasure.
+`prediction_points` is replaced by the
 idempotent SR-44 scoring function and stores only correct picks. Their
 retention, erasure and backup disposal follow SR-41; SR-44 adds no automatic
 deletion.
@@ -112,8 +128,13 @@ only dependency status, do not persist probe results and do not reveal errors.
 SR-56 adds no database field, session, report collection or server-side wallet
 preference. `scoutreport:rp-declaration:<lowercase connected address>` in browser
 `localStorage` contains only `true` or `false`, defaulting to false if absent or
-storage is unavailable. It is not verification and is never transmitted,
-including to RPC providers. Unchecking saves false; clearing site storage removes
+storage is unavailable. It is not verification. The current implementation keeps
+this flag in the browser; the revised legal policy permits reported RP to be sent
+only with consent, which can be withdrawn. No report-submission flow or
+consent-transmission mechanism is added by SR-17. The draft describes the RP
+Estimate panel as showing holdings only and assuming a Socios Wallet based on
+the user's declaration, not verified wallet identity.
+Unchecking saves false; clearing site storage removes
 it. It remains in that browser until changed/cleared. Address switches and
 disconnects immediately hide figures; reconnecting restores only that address's
 own declaration. This local key contains a public address, still personal data.
@@ -132,3 +153,85 @@ wallet holdings/account-context reads are unchanged.
 calibration list is empty: no real theta, individual reports, reporter addresses,
 RP balance/history or pool values have been provided or persisted by this work.
 Only synthetic test fixtures contain illustrative RP parameters.
+
+## SR-17 draft legal notice and display rules
+
+`/privacy` and `/terms` are static drafts, marked “Draft, pending legal review”.
+All legal copy and the shared controller/contact/retention placeholders live in
+`apps/web/src/copy/names.ts`. No approved controller, contact, lawful basis,
+complete production retention schedule, provider/transfer assessment or backup-disposal
+policy has been supplied. The notice must not be treated as legal approval.
+The draft is version 0.2, last updated 14 October 2026. Both pages state that the
+service is for users 18 or over and does not knowingly process children's data;
+the terms also state the 18+ eligibility requirement. Public Chiliz Chain records
+are the source of chain data. Sign-in and rights requests require a wallet
+signature; sign-in costs no gas and moves no funds. The notice includes the
+right to object and no solely automated decisions with legal or similarly
+significant effects. User-facing copy points to the privacy contact, not internal
+tickets, schemas or endpoint notes.
+
+The revised draft wording is: “On erasure, we delete your picks, terms-acceptance
+records and stored signatures, and pseudonymise your audit-log entries, which
+are kept.” The processing policy above remains to be implemented; SR-17 changes
+the draft and contract only, not the existing backend or RP panel behaviour.
+
+Wallet addresses can be personal data when linked to a person, as discussed in
+ICO distributed-ledger guidance; truncation is not anonymisation. Shared
+`AddressDisplay` truncates addresses and shows a name only when the profile is
+claimed and explicitly visible. Its full-address tooltip is absent by default;
+only the connected user's own `WalletButton` opts in with `showFullAddressTitle`.
+`ProfileHoldings` defaults to hidden and requires
+claim, visibility and `showHoldings` opt-in. Public profile consumers must use
+these safeguards and avoid fetching/serialising hidden holdings in the first
+place; a rendering guard is not server-side access control. The existing
+connected-wallet holdings/optimiser is the user's private view, not public
+publication. SR-23 owns preference persistence and toggle UI.
+
+Only the essential SIWE session cookie is used by the app; AppKit analytics is
+disabled. `apps/web/src/privacy-guardrails.test.ts` prevents known tracker
+packages/scripts and duplicated shared legal placeholders.
+
+## DELETE /api/profile contract (SR-23 / S-05 implementation, not available yet)
+
+- **Request:** same-origin `DELETE /api/profile`, no body or address parameter.
+  Derive the target address only from the verified SIWE session, never from
+  client-supplied identity. Require the encrypted session cookie and a valid
+  seven-day `issuedAt` lifetime. Verify the request Origin against the configured
+  site origin to prevent cross-site requests; reject a missing/untrusted Origin.
+- **Cost protection:** apply the shared production rate limiter and trusted
+  rate-limit key resolver before any session-dependent DB work. Fail closed
+  when these are absent; no unauthenticated request may trigger paid DB/RPC
+  work. This action needs no RPC call or on-chain transaction.
+- **Deletion:** atomically delete the profile row (`address`, `username`,
+  `show_holdings`, `claimed_chain_id`, `claimed_at`, `updated_at`), all picks
+  belonging to that wallet, terms-acceptance records, their stored signatures
+  (including future SR-45 signature/nonce records) and related
+  `prediction_points` rows. Pseudonymise the wallet's audit-log entries, which
+  are kept. Remove identifying wallet addresses and payload references; all
+  stored copies of raw signatures, including audit payloads, must be deleted
+  rather than retained under a pseudonymous label. Invalidate
+  derived off-chain public-profile caches. Delete dependent records even if the
+  profile row is already absent; do not leave orphaned signatures or
+  terms-acceptance records. The retained append-only audit history must not
+  contain recoverable wallet identifiers or signatures after erasure.
+- **Response:** `204 No Content`, empty body, `Cache-Control: no-store`; clear
+  the session cookie after a successful commit. Repeating deletion with a valid
+  session is idempotent; the cleared cookie requires sign-in for another call.
+  Missing/invalid/expired session: `401`; untrusted Origin: `403`; rate limit:
+  `429` with `Retry-After`; unexpected failure: generic `500`, with no partial
+  deletion, cookie clearing or sensitive error detail. Follow the existing
+  `{ code, message }` error shape.
+- **Limits:** on-chain transactions, balances and history cannot be erased.
+  Fixture metadata is not deleted by this profile action. Audit-log entries
+  are kept but must be pseudonymised as above, not left identifiable. The current
+  database rejects updates/deletes on `admin_audit_log`; the future implementation
+  must reconcile append-only history with erasure, including removable identifying
+  payloads/signatures, before this contract is available. No immutable-audit
+  constraint is relaxed in this ticket. Predict aggregates must be anonymised
+  after 24 months; retention periods for retained pseudonymised audit entries,
+  picks, signatures and terms records remain pending confirmation.
+  No automatic database TTL exists; production must separately approve and
+  implement backup expiry/disposal and prevent restored backups from republishing
+  deleted data. Browser-only declarations can be removed by clearing site storage.
+- **Scope:** this section defines the future contract only. SR-17 adds no route,
+  profile toggle, schema change, private key or on-chain write.

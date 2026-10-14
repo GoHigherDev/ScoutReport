@@ -1,8 +1,98 @@
 const externalWalletCaveat =
   'Staking from an external wallet does not earn Socios Reward Points. We cannot reliably verify whether this address is a Socios Wallet or qualifies for RP.'
 
+export const LEGAL_DETAILS = {
+  contact: '[PRIVACY CONTACT — TO BE CONFIRMED]',
+  controller: '[DATA CONTROLLER — TO BE CONFIRMED]',
+  retention: '[RETENTION PERIOD — TO BE CONFIRMED]',
+} as const
+
 export const NAMES = {
   product: 'ScoutReport',
+  legal: {
+    draft: 'Draft, pending legal review',
+    controller: 'Data controller',
+    contact: 'Privacy contact',
+    privacyHeading: 'Privacy notice',
+    termsHeading: 'Terms',
+    revision: 'Last updated: 14 October 2026 · Version: 0.2',
+    ageNotice:
+      "For users 18 or over; we do not knowingly process children's data.",
+    privacySections: [
+      {
+        heading: 'Data collected and purposes',
+        text: 'ScoutReport uses a wallet address to identify a profile and verify sign-in. Off-chain profile fields include an optional public name, a holdings-display preference, claim chain and time, and the latest update time. A wallet signature is required to sign in; signing in costs no gas and does not move funds. Sign-in uses a single-use nonce and message; sign-in signatures and messages are not logged. Public Chiliz Chain records are the source of wallet balances and staking history used to display holdings and estimates; they are not stored in the profile database.',
+      },
+      {
+        heading: 'Wallet addresses and public history',
+        text: 'A wallet address can be personal data when linked to a person, as discussed in ICO guidance on distributed ledger technology. Truncating an address does not make it anonymous. Chiliz Chain history is public and cannot be erased by ScoutReport. Erasure deletes off-chain profile fields, picks, prediction points, terms-acceptance records and stored signatures; audit-log entries are pseudonymised and kept. Transactions and history on-chain cannot be deleted.',
+      },
+      {
+        heading: 'Lawful bases',
+        text: '[LAWFUL BASIS FOR PROFILES AND SIGN-IN — TO BE CONFIRMED]. [LAWFUL BASIS FOR PUBLIC CHAIN READS — TO BE CONFIRMED]. These are review placeholders, not legal conclusions or regulator approval.',
+      },
+      {
+        heading: 'Off-chain Predict',
+        text: 'Picks are free and wallet-signed using EIP-712: a wallet signature is required, with no gas and no on-chain transaction. Postgres stores the wallet address, pick, signature and timestamps to verify the submission, enforce pick deadlines and calculate non-transferable prediction points. An append-only audit log records picks and signatures for accountability. [LAWFUL BASIS FOR PREDICT — TO BE CONFIRMED]. On erasure, we delete your picks, prediction points, terms-acceptance records and stored signatures, and pseudonymise your audit-log entries, which are kept. Contact the privacy contact to request erasure.',
+      },
+      {
+        heading: 'Retention',
+        text: 'Profile fields remain until deleted or replaced. Sign-in nonces expire after ten minutes; expired records are deleted when another nonce is issued. The session cookie expires after seven days or is cleared on logout. Predict aggregates are anonymised after 24 months. Retention periods for picks, signatures, terms-acceptance records and kept pseudonymised audit-log entries await confirmation. Backup disposal and hosting-log retention also await confirmation. Contact the privacy contact for retention questions.',
+      },
+      {
+        heading: 'Profile display',
+        text: 'Addresses are truncated by default. Public names are shown only for claimed, visible profiles. Public holdings display requires an explicit opt-in. The connected-wallet portfolio is a private view, not a public profile. Contact the privacy contact to request a change to your profile or holdings-display preference.',
+      },
+      {
+        heading: 'Cookies and browser storage',
+        text: "ScoutReport uses only an essential sign-in session cookie, with httpOnly, Secure and SameSite=Lax settings. No analytics or tracking is enabled; any future non-essential tracking would require prior consent. Wallet connection libraries may use browser storage to maintain a connection. If you declare a Socios Wallet, that choice is saved in this browser's local storage until you change it or clear site storage. Read caches last only for the browser context or until evicted.",
+      },
+      {
+        heading: 'Reported RP and estimates',
+        text: 'Reported RP is sent only with your consent. You can withdraw consent at any time by contacting the privacy contact. The RP Estimate panel uses your holdings only. It assumes this wallet is a Socios Wallet based on your declaration; that declaration is not verification.',
+      },
+      {
+        heading: 'Terms acceptance and country check',
+        text: 'The terms-acceptance record contains your wallet address, the terms version, the UTC time and the country-check result. We use it to record which terms you accepted and to check eligibility. The IP country check is done on our server; raw IP is not stored. [LAWFUL BASIS FOR TERMS ACCEPTANCE AND COUNTRY CHECK — TO BE CONFIRMED]. Contact the privacy contact for questions about these records.',
+      },
+      {
+        heading: 'Automated decisions',
+        text: 'We make no solely automated decisions with legal or similarly significant effects.',
+      },
+      {
+        heading: 'Recipients and infrastructure',
+        text: 'Hosting and database providers process off-chain data. RPC providers receive wallet addresses used in public chain reads, and wallet connection providers support connections. [PROVIDER IDENTITIES, PROCESSING LOCATIONS AND TRANSFER SAFEGUARDS — TO BE CONFIRMED]. No private keys are collected by ScoutReport.',
+      },
+      {
+        heading: 'Your rights and requests',
+        text: 'You can contact the privacy contact to request access, correction, erasure, restriction or portability of your personal data. You have the right to object to processing, subject to the applicable lawful basis and limits. Where processing relies on consent, you can withdraw it. The applicable rights and any limits depend on the processing and lawful basis, which remain under review. A wallet signature is required to verify wallet control when handling your request; we never request private keys.',
+      },
+      {
+        heading: 'Complaints',
+        text: 'You can raise a privacy concern with the privacy contact and can complain to the UK Information Commissioner’s Office (ICO). This draft does not claim ICO approval.',
+      },
+    ],
+    predictRetention: 'Predict retention period',
+    icoLink: 'ICO: make a data protection complaint',
+    termsSections: [
+      {
+        heading: 'Independent service',
+        text: 'ScoutReport is a third-party dapp on Chiliz Chain, not affiliated with Socios.com.',
+      },
+      {
+        heading: 'No financial advice',
+        text: 'Information shown is for general information only, not financial or investment advice. Figures and estimates may be incomplete or unavailable. You are responsible for checking information before making decisions; no rewards or returns are promised.',
+      },
+      {
+        heading: 'Draft scope',
+        text: 'These terms are a draft pending legal review. [SERVICE TERMS, ELIGIBILITY AND GOVERNING LAW — TO BE CONFIRMED]. A wallet signature is required to sign in; signing in costs no gas and does not move funds. Predict picks are free, off-chain and wallet-signed with no gas. When you accept the terms, we record your wallet address, the terms version, the UTC time and the country-check result. The IP country check is done on our server; raw IP is not stored. Contact the privacy contact with questions about the terms or your records.',
+      },
+      {
+        heading: '18+ eligibility',
+        text: 'You must be 18 or over to use ScoutReport.',
+      },
+    ],
+  },
   admin: {
     heading: 'Admin matches',
     accessRequired: 'Sign in with an approved admin wallet to manage matches.',
@@ -178,7 +268,7 @@ export const NAMES = {
         'Source-confirmed routes are not confirmation of your eligibility or points received. Other activities remain unconfirmed as RP routes.',
       confirmed: 'Source-confirmed',
       unconfirmed: 'Unconfirmed',
-      researchLink: 'R-01 research, route evidence and limitations',
+      researchLink: 'Research, route evidence and limitations',
       staking: {
         name: 'Fan Token staking via the Socios app',
         howTo:
@@ -222,8 +312,7 @@ export const NAMES = {
   connectWallet: 'Connect wallet',
   wallet: {
     disconnect: 'Disconnect',
-    unavailable:
-      'Wallet connection is unavailable. Set NEXT_PUBLIC_REOWN_PROJECT_ID.',
+    unavailable: 'Wallet connection is unavailable. Please try again later.',
     connectionError: 'Unable to open wallet connection. Please try again.',
     disconnectError: 'Unable to disconnect. Please try again.',
     spicy: 'Spicy',

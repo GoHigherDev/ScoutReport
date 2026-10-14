@@ -1,4 +1,9 @@
 export { Button } from './button'
+export { AddressDisplay, ProfileHoldings } from './profile-display'
+export type {
+  AddressDisplayProps,
+  ProfileHoldingsProps,
+} from './profile-display'
 export type { ButtonProps } from './button'
 export { TxButton } from './tx-button'
 export type { TxButtonProps, TxState } from './tx-button'
