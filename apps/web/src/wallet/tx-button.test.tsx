@@ -138,7 +138,9 @@ it.each([
   })
   render(<TransactionButton request={request} />)
   fireEvent.click(screen.getByRole('button'))
-  await screen.findByRole('alert')
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    changed.chainId !== 88882 ? NAMES.gas.wrong_network : NAMES.gas.unknown,
+  )
   expect(mocks.send).not.toHaveBeenCalled()
 })
 

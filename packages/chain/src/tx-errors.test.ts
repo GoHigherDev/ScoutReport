@@ -1,11 +1,16 @@
 import { ContractFunctionRevertedError, encodeErrorResult } from 'viem'
 import { describe, expect, it } from 'vitest'
+import predictionsAbi from '../abis/ScoutReportPredictions.json' with { type: 'json' }
 import { decodeTxError, SCOUTREPORT_ABIS } from './tx-errors.ts'
 
 const messages = { MatchLocked: 'This match is locked.' }
 const fallback = 'The transaction could not be completed.'
 
 describe('decodeTxError', () => {
+  it('uses the canonical chain ABI export', () => {
+    expect(SCOUTREPORT_ABIS[0]).toBe(predictionsAbi)
+  })
+
   it('decodes an ABI custom error from raw data or nested viem causes', () => {
     const data = encodeErrorResult({
       abi: SCOUTREPORT_ABIS[0],

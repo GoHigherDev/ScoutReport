@@ -1,5 +1,5 @@
 import { decodeErrorResult, type Abi, type Hex } from 'viem'
-import predictionsAbi from '../../contracts/abis/ScoutReportPredictions.json' with { type: 'json' }
+import predictionsAbi from '../abis/ScoutReportPredictions.json' with { type: 'json' }
 
 export const SCOUTREPORT_ABIS: readonly Abi[] = [predictionsAbi as Abi]
 

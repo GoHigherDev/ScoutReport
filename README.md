@@ -405,12 +405,12 @@ has neutral CHZ gas guidance with no purchase links. Connected wallets also
 see the approved no-gas/no-funds statement before SIWE signing.
 `decodeTxError` decodes ScoutReport ABI custom errors, including nested viem
 causes, using application-supplied messages and a generic fallback.
-Regenerate `packages/contracts/abis/ScoutReportPredictions.json` from the
+Regenerate `packages/chain/abis/ScoutReportPredictions.json` from the
 contract when its ABI changes:
 
 ```sh
 cd packages/contracts
-forge inspect ScoutReportPredictions abi --json > abis/ScoutReportPredictions.json
+forge inspect ScoutReportPredictions abi --json > ../chain/abis/ScoutReportPredictions.json
 ```
 
 See [ADR 0002](docs/adr/0002-gas-sponsorship.md): paymaster and account

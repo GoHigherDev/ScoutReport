@@ -16,6 +16,8 @@ import { TxButton, type ButtonProps } from '@scoutreport/ui'
 import { NAMES } from '../copy/names'
 import { InsufficientGasPanel } from './gas-panel'
 
+class WrongNetworkError extends Error {}
+
 export type TransactionButtonProps = Pick<
   ButtonProps,
   'disabled' | 'className' | 'variant'
@@ -52,8 +54,11 @@ export function TransactionButton({
           account: address,
         })
         const current = getAccount(config)
-        if (current.chainId !== chain.id || current.address !== address) {
-          throw new Error(NAMES.gas.wrong_network)
+        if (current.chainId !== chain.id) {
+          throw new WrongNetworkError()
+        }
+        if (current.address !== address) {
+          throw new Error(NAMES.gas.unknown)
         }
         return wallet.sendTransaction({ ...request, account: address, chain })
       }}
@@ -71,7 +76,9 @@ export function TransactionButton({
       }}
       explorerUrl={(hash) => explorerTxUrl(chain.id, hash)}
       decodeError={(error) =>
-        decodeTxError(error, NAMES.gas.errors, NAMES.gas.unknown)
+        error instanceof WrongNetworkError
+          ? NAMES.gas.wrong_network
+          : decodeTxError(error, NAMES.gas.errors, NAMES.gas.unknown)
       }
       insufficientGasPanel={<InsufficientGasPanel />}
     />

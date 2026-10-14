@@ -9,6 +9,22 @@ it('preserves the approved SIWE statement and sign-in error wording', () => {
   })
 })
 
+it('uses the final approved SR-18 copy', () => {
+  expect(NAMES.gas).toMatchObject({
+    insufficient_gas:
+      "You don't have enough CHZ to cover this transaction and its gas fee.",
+    unknown: 'The transaction could not be completed. Please try again.',
+    spicyExplanation:
+      'Spicy testnet transactions need test CHZ for gas. Test CHZ has no value. You can request it from a faucet.',
+    errors: {
+      MatchLocked:
+        'This match is locked, so predictions can no longer be changed.',
+      AccessControlBadConfirmation:
+        'The confirming account does not match this wallet.',
+    },
+  })
+})
+
 const bannedPhrases = [
   'buy',
   'cheapest',
