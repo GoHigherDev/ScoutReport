@@ -15,6 +15,13 @@
       "when": 1791888419505,
       "tag": "0001_initial-scaffold",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791974650752,
+      "tag": "0002_familiar_mindworm",
+      "breakpoints": true
     }
   ]
 }

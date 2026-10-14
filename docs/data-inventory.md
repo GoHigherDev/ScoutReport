@@ -8,8 +8,9 @@ SR-14 adds SIWE nonce writes and encrypted browser sessions, not profile writes.
 
 ## Persistent fields
 
-There are no profile or admin write routes. SIWE enforces single use and a
-ten-minute nonce expiry; new nonce issuance deletes already-expired rows,
+There are no profile write routes. SR-44 adds session/allowlist-gated off-chain
+match management, picks, prediction points and append-only admin audit writes.
+SIWE enforces single use and a ten-minute nonce expiry; new nonce issuance deletes already-expired rows,
 including consumed rows. There is no scheduled deletion or automatic database
 TTL, so expired rows remain until another nonce is issued. The following
 retention descriptions document actual behaviour, not an approved production
@@ -17,28 +18,60 @@ retention policy. F-12 must define and implement
 production retention, erasure and backup disposal before personal data is
 collected in production. Expiry timestamps alone do not delete rows.
 
-| Table / field                   | Purpose                                                               | Current retention                                                      |
-| ------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `profiles.address`              | Lowercase wallet address; profile primary key                         | Until profile row is explicitly deleted                                |
-| `profiles.username`             | Optional public alias; case-insensitive uniqueness through `citext`   | Until replaced, cleared or profile deleted                             |
-| `profiles.show_holdings`        | Opt-in display preference; defaults to false, not a holdings snapshot | Until preference changed or profile deleted                            |
-| `profiles.claimed_chain_id`     | Optional chain identifier associated with a profile claim             | Until cleared/replaced or profile deleted                              |
-| `profiles.claimed_at`           | Optional time of profile claim, with time zone                        | Until cleared/replaced or profile deleted                              |
-| `profiles.updated_at`           | Time of the latest profile change, with time zone                     | Until overwritten or profile deleted                                   |
-| `siwe_nonces.nonce`             | Unique challenge for SIWE replay protection                           | Deleted on nonce issuance after its ten-minute expiry                  |
-| `siwe_nonces.created_at`        | Time the challenge was created                                        | Same as nonce row                                                      |
-| `siwe_nonces.expires_at`        | Deadline after which auth rejects the challenge                       | Same as nonce row; no scheduled purge                                  |
-| `siwe_nonces.used_at`           | Optional consumption time to prevent reuse                            | Same as nonce row                                                      |
-| `admin_audit_log.id`            | Random UUID identifying an audit event                                | Until explicitly deleted under the F-12 policy                         |
-| `admin_audit_log.actor_address` | Lowercase wallet identifying the admin actor                          | Same as audit row                                                      |
-| `admin_audit_log.action`        | Identifier of the admin action                                        | Same as audit row                                                      |
-| `admin_audit_log.payload`       | JSON object containing minimal action metadata                        | Same as audit row                                                      |
-| `admin_audit_log.created_at`    | Time of the admin event, with time zone                               | Same as audit row                                                      |
+| Table / field                                    | Purpose                                                               | Current retention                                     |
+| ------------------------------------------------ | --------------------------------------------------------------------- | ----------------------------------------------------- |
+| `profiles.address`                               | Lowercase wallet address; profile primary key                         | Until profile row is explicitly deleted               |
+| `profiles.username`                              | Optional public alias; case-insensitive uniqueness through `citext`   | Until replaced, cleared or profile deleted            |
+| `profiles.show_holdings`                         | Opt-in display preference; defaults to false, not a holdings snapshot | Until preference changed or profile deleted           |
+| `profiles.claimed_chain_id`                      | Optional chain identifier associated with a profile claim             | Until cleared/replaced or profile deleted             |
+| `profiles.claimed_at`                            | Optional time of profile claim, with time zone                        | Until cleared/replaced or profile deleted             |
+| `profiles.updated_at`                            | Time of the latest profile change, with time zone                     | Until overwritten or profile deleted                  |
+| `siwe_nonces.nonce`                              | Unique challenge for SIWE replay protection                           | Deleted on nonce issuance after its ten-minute expiry |
+| `siwe_nonces.created_at`                         | Time the challenge was created                                        | Same as nonce row                                     |
+| `siwe_nonces.expires_at`                         | Deadline after which auth rejects the challenge                       | Same as nonce row; no scheduled purge                 |
+| `siwe_nonces.used_at`                            | Optional consumption time to prevent reuse                            | Same as nonce row                                     |
+| `matches.id`                                     | UUID identifying an off-chain match                                   | Until explicitly deleted under SR-41 retention        |
+| `matches.sport`                                  | Football or CS2 sport identifier                                      | Same as match row                                     |
+| `matches.home_label` / `away_label`              | Match side labels and optional Fan Token keys                         | Same as match row                                     |
+| `matches.external_ref`                           | Optional official fixture reference                                   | Same as match row                                     |
+| `matches.kickoff_utc` / `lock_at_utc`            | UTC fixture and pick-lock times                                       | Same as match row                                     |
+| `matches.outcomes`                               | Ordered outcome keys available to picks                               | Same as match row                                     |
+| `matches.points_for_correct`                     | Points credited for a correct pick                                    | Same as match row                                     |
+| `matches.status` / `result`                      | Open, settled or voided state and final outcome                       | Same as match row                                     |
+| `matches.void_reason`                            | Admin-supplied reason for a postponed or abandoned match              | Same as match row                                     |
+| `matches.created_by` / lifecycle fields          | Admin wallet and UTC create/update/settle/void timestamps             | Same as match row                                     |
+| `picks.match_id` / `address`                     | One current pick per wallet and match                                 | Follows SR-41 retention and erasure                   |
+| `picks.outcome`                                  | The wallet's selected match outcome                                   | Same as pick row                                      |
+| `picks.created_at` / `updated_at`                | Server timestamps used to enforce lock and scoring eligibility        | Same as pick row                                      |
+| `prediction_points.match_id` / `address`         | Match and wallet key for idempotently calculated points               | Follows SR-41 retention and erasure                   |
+| `prediction_points.points`                       | Points for a correct pick; wrong picks have no score row              | Same as score row                                     |
+| `prediction_points.week_start_utc` / `season_id` | UTC Monday week and season aggregation keys                           | Same as score row                                     |
+| `prediction_points.credited_at`                  | UTC time the scoring function last calculated this wallet's row       | Same as score row                                     |
+| `admin_audit_log.id`                             | Random UUID identifying an audit event                                | Until explicitly deleted under the F-12 policy        |
+| `admin_audit_log.actor_address`                  | Lowercase wallet identifying the admin actor                          | Same as audit row                                     |
+| `admin_audit_log.action`                         | Identifier of the admin action                                        | Same as audit row                                     |
+| `admin_audit_log.payload`                        | JSON object containing minimal action metadata                        | Same as audit row                                     |
+| `admin_audit_log.created_at`                     | Time of the admin event, with time zone                               | Same as audit row                                     |
 
-Future audit writers must allowlist payload fields per action, not dump request
+The `matches` table stores off-chain fixture metadata and lifecycle state;
+there are no chain IDs, derived contract match IDs or transaction hashes.
+`picks` stores the current pick for each wallet/match without signatures or
+nonces; SR-45 owns those fields. `prediction_points` is replaced by the
+idempotent SR-44 scoring function and stores only correct picks. Their
+retention, erasure and backup disposal follow SR-41; SR-44 adds no automatic
+deletion.
+
+SR-44 audit actions are `matches.create`, `matches.edit`, `matches.settle`,
+`matches.void` and `matches.credit`. Each payload contains before/after state;
+scoring actions also include the correct-pick count and total points. Audit
+rows are written in the same transaction as the corresponding database action,
+and the database rejects updates and deletes. They do not store SIWE messages,
+signatures, official-source page contents or raw provider errors.
+
+Audit writers must allowlist payload fields per action, not dump request
 bodies or sessions. Do not include nonce values, credentials, emails, IPs,
-unneeded wallet data or raw provider responses in payloads. The schema has no
-approved action types yet; those validators belong to the stories adding writes.
+unneeded wallet data or raw provider responses in payloads. SR-44 validates its
+action types; any future action needs its own validator.
 
 Drizzle additionally stores migration bookkeeping in
 `drizzle.__drizzle_migrations`: `id` (migration row identifier), `hash` (migration

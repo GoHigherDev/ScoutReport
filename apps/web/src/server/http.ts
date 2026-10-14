@@ -4,6 +4,7 @@ export type ErrorCode =
   | 'INVALID_REQUEST'
   | 'UNAUTHORISED'
   | 'FORBIDDEN'
+  | 'CONFLICT'
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR'
 
