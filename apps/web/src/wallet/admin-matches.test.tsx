@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   fetch: vi.fn(),
   requests: [] as TransactionButtonProps[],
+  receiptStatus: 'success' as 'success' | 'reverted',
 }))
 vi.mock('wagmi', () => ({ useAccount: mocks.account }))
 vi.mock('@scoutreport/chain', async (original) => ({
@@ -37,7 +38,7 @@ vi.mock('./tx-button', () => ({
     return (
       <button
         disabled={props.disabled}
-        onClick={() => void props.onReceipt?.(hash, 'success')}
+        onClick={() => void props.onReceipt?.(hash, mocks.receiptStatus)}
       >
         {props.label}
       </button>
@@ -71,6 +72,7 @@ const open = {
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.requests.length = 0
+  mocks.receiptStatus = 'success'
   mocks.address.mockReturnValue(contract)
   mocks.account.mockReturnValue({ address: actor, chainId: 88882 })
   mocks.read.mockResolvedValue(open)
@@ -348,4 +350,37 @@ it('retains a submitted hash and blocks resubmission after receipt monitoring is
   expect(screen.getByText(hash)).toBeInTheDocument()
   expect(screen.getByText(NAMES.admin.receiptPending)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: NAMES.admin.void })).toBeDisabled()
+})
+
+it('audits a reverted credit attempt but keeps failure visible and does not start another batch', async () => {
+  mocks.receiptStatus = 'reverted'
+  mocks.read.mockResolvedValue({
+    ...open,
+    status: 2,
+    creditedCursor: 50,
+  })
+  setup()
+  await screen.findByText(`${NAMES.admin.progress}: 50 / 120`)
+  fireEvent.click(screen.getByRole('button', { name: NAMES.admin.credit }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: NAMES.admin.credit }),
+  )
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  )
+  expect(screen.getByRole('alert')).toHaveTextContent(NAMES.gas.failed)
+  expect(
+    screen.getByText(`${NAMES.admin.progress}: 50 / 120`),
+  ).toBeInTheDocument()
+  expect(mocks.fetch).toHaveBeenCalledWith(
+    '/api/admin/matches/audit',
+    expect.objectContaining({
+      body: JSON.stringify({
+        matchId: match.matchId,
+        action: 'creditPoints',
+        txHash: hash,
+      }),
+    }),
+  )
 })

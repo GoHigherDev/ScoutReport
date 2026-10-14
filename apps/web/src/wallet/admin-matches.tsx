@@ -247,6 +247,7 @@ function MatchCard({
   const [action, setAction] = useState<Action>()
   const [pendingAudit, setPendingAudit] = useState<Audit>()
   const [auditError, setAuditError] = useState(false)
+  const [receiptFailure, setReceiptFailure] = useState(false)
   const [recording, setRecording] = useState(false)
   const [transacting, setTransacting] = useState(false)
   const [recoveryAction, setRecoveryAction] = useState<Action>('createMatch')
@@ -306,7 +307,7 @@ function MatchCard({
     if (action) dialog.current?.showModal()
   }, [action])
 
-  async function record(audit: Audit) {
+  async function record(audit: Audit, reverted = receiptFailure) {
     setRecording(true)
     setAuditError(false)
     try {
@@ -316,6 +317,7 @@ function MatchCard({
       dialog.current?.close()
       const refreshed = await state.refetch()
       if (
+        !reverted &&
         (audit.action === 'settle' || audit.action === 'creditPoints') &&
         refreshed.data?.status === 2 &&
         refreshed.data.creditedCursor < refreshed.data.predictorCount
@@ -436,6 +438,7 @@ function MatchCard({
         </p>
       )}
       <p className="text-sm text-sr-muted">{NAMES.admin.resumeHelp}</p>
+      {receiptFailure && <p role="alert">{NAMES.gas.failed}</p>}
       {pendingAudit && (
         <div className="space-y-2">
           {auditError && <p role="alert">{NAMES.admin.auditError}</p>}
@@ -536,11 +539,13 @@ function MatchCard({
             onSubmitted={(txHash) => {
               setPendingAudit({ matchId: match.matchId, action, txHash })
               setAuditError(false)
+              setReceiptFailure(false)
             }}
-            onReceipt={async (txHash) => {
+            onReceipt={async (txHash, status) => {
+              setReceiptFailure(status === 'reverted')
               const audit = { matchId: match.matchId, action, txHash }
               setPendingAudit(audit)
-              await record(audit)
+              await record(audit, status === 'reverted')
             }}
           />
         )}
