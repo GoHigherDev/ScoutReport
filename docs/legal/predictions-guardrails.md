@@ -25,8 +25,8 @@ Existing contract experiments are not part of this Predict flow.
   of birth or IP from the client.
 - Both endpoints validate Origin against `NEXT_PUBLIC_SITE_URL`, decrypt and
   validate the SIWE session, then consume a shared Postgres rate limit of
-  20 requests per wallet per minute shared with the SR-45 Predict endpoints. Authentication and
-  Origin rejection occur **before any paid DB work**, including rate limiting.
+  20 requests per wallet per minute shared with the SR-45 Predict endpoints.
+  Authentication and Origin rejection occur **before any paid DB work**, including rate limiting.
   The bounded bodies are validated before acceptance writes. Responses are
   `no-store`; failures use existing 400/401/403/429/500 response conventions.
   Repeated acceptance is idempotent and retains the first acceptance timestamp.
@@ -92,8 +92,8 @@ restrict secret access, retention and backups separately.
 Migration `0003_predict_guardrails.sql` installs `erase_predict_data`, invoked
 in one transaction. The application helper first takes the same per-wallet
 transaction lock as SR-45 pick/challenge writers, so erasure also serialises
-with a wallet's first pick. The function then locks affected matches in ID order, serialising
-with existing scoring/admin writers before scanning their committed audit rows.
+with a wallet's first pick. The function then locks affected matches in ID order,
+serialising with existing scoring/admin writers before scanning their committed audit rows.
 It deletes picks (including signatures), points,
 terms/18+ records, Predict nonces, wallet-linked SIWE nonces and rate-limit
 rows. It nulls Predict audit signatures, replaces wallet columns with the

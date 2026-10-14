@@ -2,11 +2,7 @@ import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import { WalletProviders } from '../wallet/providers'
-import {
-  HoldingsStrip,
-  WalletButton,
-  WrongNetworkBanner,
-} from '../wallet/components'
+import { WalletButton, WalletChainPanels } from '../wallet/components'
 import { NAMES } from '../copy/names'
 import './globals.css'
 
@@ -99,8 +95,7 @@ export default function RootLayout({
               </div>
             </div>
           </header>
-          <WrongNetworkBanner />
-          <HoldingsStrip />
+          <WalletChainPanels />
           <div className="flex flex-1 flex-col">{children}</div>
           <footer className="border-t border-sr-border bg-sr-bg">
             <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-6 text-sm text-sr-muted sm:px-6">

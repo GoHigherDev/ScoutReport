@@ -64,8 +64,8 @@ collected in production. Expiry timestamps alone do not delete rows.
 | `prediction_audit.address` / `signature`                        | Wallet and nullable EIP-712 signature                                                  | Erasure replaces address with keyed pseudonym and nulls signature |
 
 Each authenticated Predict request using the shared limiter opportunistically
-deletes up to 100 other rate-limit rows expired for over an hour, oldest first, skipping locked
-rows. Active/recent limits remain; the current wallet is excluded and its counter
+deletes up to 100 other rate-limit rows expired for over an hour, oldest first,
+skipping locked rows. Active/recent limits remain; the current wallet is excluded and its counter
 is reset on expiry. No scheduled TTL exists: cleanup depends on traffic and rows
 can remain longer when there is no traffic, a backlog or a lock. Wallet erasure
 also removes its rate-limit row.

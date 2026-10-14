@@ -14,6 +14,7 @@ describe('app shell', () => {
     expect(markup).toContain('>Leaderboards</a>')
     expect(markup).toContain('>Rewards Optimizer</a>')
     expect(markup).toContain('href="/optimiser"')
+    expect(markup).toContain('href="/predict"')
     expect(markup).toContain('disabled="" aria-disabled="true"')
     expect(markup).toContain('>Connect wallet</button>')
     expect(markup).toContain('aria-label="Legal"')

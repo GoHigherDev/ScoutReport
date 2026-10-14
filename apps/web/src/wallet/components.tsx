@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { useConnection, useDisconnect, useConnectorClient } from 'wagmi'
 import { createWalletClient, custom } from 'viem'
 import {
@@ -22,6 +23,21 @@ import { useWalletModal } from './providers'
 import { useHoldings } from './hooks'
 import { SignInButton } from './sign-in-button'
 
+function isPredictPath(pathname: string | null) {
+  return pathname === '/predict' || pathname?.startsWith('/predict/')
+}
+
+export function WalletChainPanels() {
+  const pathname = usePathname()
+  if (isPredictPath(pathname)) return null
+  return (
+    <>
+      <WrongNetworkBanner />
+      <HoldingsStrip />
+    </>
+  )
+}
+
 export function NetworkBadge() {
   const { chainId, isConnected } = useConnection()
   const id = isConnected ? chainId : getAppChain().id
@@ -41,6 +57,7 @@ export function NetworkBadge() {
 }
 
 export function WalletButton() {
+  const predict = isPredictPath(usePathname())
   const { address, isConnected } = useConnection()
   const { disconnectAsync, isPending } = useDisconnect()
   const { available, openConnect } = useWalletModal()
@@ -61,7 +78,7 @@ export function WalletButton() {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <NetworkBadge />
+        {!predict && <NetworkBadge />}
         {isConnected && address && (
           <AddressDisplay address={address} showFullAddressTitle />
         )}
@@ -74,7 +91,7 @@ export function WalletButton() {
           {isConnected ? NAMES.wallet.disconnect : NAMES.connectWallet}
         </Button>
       </div>
-      {isConnected && address && <SignInButton key={address} />}
+      {!predict && isConnected && address && <SignInButton key={address} />}
       {!available && !isConnected && (
         <p className="mt-2 max-w-xs text-xs text-sr-muted">
           {NAMES.wallet.unavailable}
