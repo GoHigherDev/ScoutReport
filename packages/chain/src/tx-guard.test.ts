@@ -114,6 +114,25 @@ describe('checkTxGuard', () => {
     })
   })
 
+  it('uses the supplied priority fee when deriving a missing total fee cap', async () => {
+    const options = setup()
+    options.client.estimateFeesPerGas.mockResolvedValue({
+      maxFeePerGas: 2n,
+      maxPriorityFeePerGas: 1n,
+    })
+    expect(
+      await checkTxGuard({ ...request, maxPriorityFeePerGas: 10n }, options),
+    ).toEqual({ ok: false, reason: 'insufficient_gas' })
+    options.client.getBalance.mockResolvedValue(110n)
+    expect(
+      await checkTxGuard({ ...request, maxPriorityFeePerGas: 10n }, options),
+    ).toEqual({ ok: true })
+    options.client.estimateFeesPerGas.mockResolvedValue({ gasPrice: 2n })
+    expect(
+      await checkTxGuard({ ...request, maxPriorityFeePerGas: 10n }, options),
+    ).toEqual({ ok: false, reason: 'unknown' })
+  })
+
   it('blocks account and network changes during the check', async () => {
     for (const changed of [
       { address, chainId: 88888 },

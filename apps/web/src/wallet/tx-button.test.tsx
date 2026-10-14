@@ -102,6 +102,21 @@ it('blocks low balance and shows faucet guidance before wallet preparation', asy
   expect(mocks.send).not.toHaveBeenCalled()
 })
 
+it('blocks a supplied priority fee that the current balance cannot cover', async () => {
+  mocks.rpc.estimateFeesPerGas.mockResolvedValue({
+    maxFeePerGas: 2n,
+    maxPriorityFeePerGas: 1n,
+  })
+  render(
+    <TransactionButton request={{ ...request, maxPriorityFeePerGas: 10n }} />,
+  )
+  fireEvent.click(screen.getByRole('button'))
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    NAMES.gas.insufficient_gas,
+  )
+  expect(mocks.send).not.toHaveBeenCalled()
+})
+
 it('blocks DATA_CHAIN wallets without RPC work', async () => {
   mocks.account.mockReturnValue({ address, chainId: 88888 })
   render(<TransactionButton request={request} />)

@@ -62,6 +62,18 @@ export async function checkTxGuard(
     if (fee === undefined) {
       const fees = await rpc.estimateFeesPerGas()
       fee = fees.maxFeePerGas ?? fees.gasPrice
+      if (request.maxPriorityFeePerGas !== undefined) {
+        if (
+          fees.maxFeePerGas === undefined ||
+          fees.maxPriorityFeePerGas === undefined
+        ) {
+          return { ok: false, reason: 'unknown' }
+        }
+        fee =
+          fees.maxFeePerGas -
+          fees.maxPriorityFeePerGas +
+          request.maxPriorityFeePerGas
+      }
     }
     if (fee === undefined || fee <= 0n || gas <= 0n) {
       return { ok: false, reason: 'unknown' }
