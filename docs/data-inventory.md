@@ -19,59 +19,76 @@ implements erasure. Approved production retention and backup disposal are
 still required before personal data is
 collected in production. Expiry timestamps alone do not delete rows.
 
-| Table / field                                    | Purpose                                                               | Current retention                                     |
-| ------------------------------------------------ | --------------------------------------------------------------------- | ----------------------------------------------------- |
-| `profiles.address`                               | Lowercase wallet address; profile primary key                         | Until profile row is explicitly deleted               |
-| `profiles.username`                              | Optional public alias; case-insensitive uniqueness through `citext`   | Until replaced, cleared or profile deleted            |
-| `profiles.show_holdings`                         | Opt-in display preference; defaults to false, not a holdings snapshot | Until preference changed or profile deleted           |
-| `profiles.claimed_chain_id`                      | Optional chain identifier associated with a profile claim             | Until cleared/replaced or profile deleted             |
-| `profiles.claimed_at`                            | Optional time of profile claim, with time zone                        | Until cleared/replaced or profile deleted             |
-| `profiles.updated_at`                            | Time of the latest profile change, with time zone                     | Until overwritten or profile deleted                  |
-| `siwe_nonces.nonce`                              | Unique challenge for SIWE replay protection                           | Deleted on nonce issuance after its ten-minute expiry |
-| `siwe_nonces.created_at`                         | Time the challenge was created                                        | Same as nonce row                                     |
-| `siwe_nonces.expires_at`                         | Deadline after which auth rejects the challenge                       | Same as nonce row; no scheduled purge                 |
-| `siwe_nonces.used_at`                            | Optional consumption time to prevent reuse                            | Same as nonce row                                     |
-| `matches.id`                                     | UUID identifying an off-chain match                                   | Until explicitly deleted under SR-41 retention        |
-| `matches.sport`                                  | Football or CS2 sport identifier                                      | Same as match row                                     |
-| `matches.home_label` / `away_label`              | Match side labels and optional Fan Token keys                         | Same as match row                                     |
-| `matches.external_ref`                           | Optional official fixture reference                                   | Same as match row                                     |
-| `matches.kickoff_utc` / `lock_at_utc`            | UTC fixture and pick-lock times                                       | Same as match row                                     |
-| `matches.outcomes`                               | Ordered outcome keys available to picks                               | Same as match row                                     |
-| `matches.points_for_correct`                     | Points credited for a correct pick                                    | Same as match row                                     |
-| `matches.status` / `result`                      | Open, settled or voided state and final outcome                       | Same as match row                                     |
-| `matches.void_reason`                            | Admin-supplied reason for a postponed or abandoned match              | Same as match row                                     |
-| `matches.created_by` / lifecycle fields          | Admin wallet and UTC create/update/settle/void timestamps             | Same as match row                                     |
-| `picks.match_id` / `address`                     | One current pick per wallet and match                                 | Follows SR-41 retention and erasure                   |
-| `picks.outcome`                                  | The wallet's selected match outcome                                   | Same as pick row                                      |
-| `picks.created_at` / `updated_at`                | Server timestamps used to enforce lock and scoring eligibility        | Same as pick row                                      |
-| `prediction_points.match_id` / `address`         | Match and wallet key for idempotently calculated points               | Follows SR-41 retention and erasure                   |
-| `prediction_points.points`                       | Points for a correct pick; wrong picks have no score row              | Same as score row                                     |
-| `prediction_points.week_start_utc` / `season_id` | UTC Monday week and season aggregation keys                           | Same as score row                                     |
-| `prediction_points.credited_at`                  | UTC time the scoring function last calculated this wallet's row       | Same as score row                                     |
-| `admin_audit_log.id`                             | Random UUID identifying an audit event                                | Until explicitly deleted under the F-12 policy        |
-| `admin_audit_log.actor_address`                  | Lowercase wallet identifying the admin actor                          | Same as audit row                                     |
-| `admin_audit_log.action`                         | Identifier of the admin action                                        | Same as audit row                                     |
-| `admin_audit_log.payload`                        | JSON object containing minimal action metadata                        | Same as audit row                                     |
-| `admin_audit_log.created_at`                     | Time of the admin event, with time zone                               | Same as audit row                                     |
+| Table / field                                                   | Purpose                                                                                | Current retention                                                 |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `profiles.address`                                              | Lowercase wallet address; profile primary key                                          | Until profile row is explicitly deleted                           |
+| `profiles.username`                                             | Optional public alias; case-insensitive uniqueness through `citext`                    | Until replaced, cleared or profile deleted                        |
+| `profiles.show_holdings`                                        | Opt-in display preference; defaults to false, not a holdings snapshot                  | Until preference changed or profile deleted                       |
+| `profiles.claimed_chain_id`                                     | Optional chain identifier associated with a profile claim                              | Until cleared/replaced or profile deleted                         |
+| `profiles.claimed_at`                                           | Optional time of profile claim, with time zone                                         | Until cleared/replaced or profile deleted                         |
+| `profiles.updated_at`                                           | Time of the latest profile change, with time zone                                      | Until overwritten or profile deleted                              |
+| `siwe_nonces.nonce`                                             | Unique challenge for SIWE replay protection                                            | Deleted on nonce issuance after its ten-minute expiry             |
+| `siwe_nonces.created_at`                                        | Time the challenge was created                                                         | Same as nonce row                                                 |
+| `siwe_nonces.expires_at`                                        | Deadline after which auth rejects the challenge                                        | Same as nonce row; no scheduled purge                             |
+| `siwe_nonces.used_at`                                           | Optional consumption time to prevent reuse                                             | Same as nonce row                                                 |
+| `siwe_nonces.address`                                           | Wallet linked on verified consumption or nonce issuance from a verified session        | Deleted by Predict erasure or expired-nonce cleanup               |
+| `matches.id`                                                    | UUID identifying an off-chain match                                                    | Until explicitly deleted under SR-41 retention                    |
+| `matches.sport`                                                 | Football or CS2 sport identifier                                                       | Same as match row                                                 |
+| `matches.home_label` / `away_label`                             | Match side labels and optional Fan Token keys                                          | Same as match row                                                 |
+| `matches.external_ref`                                          | Optional official fixture reference                                                    | Same as match row                                                 |
+| `matches.kickoff_utc` / `lock_at_utc`                           | UTC fixture and pick-lock times                                                        | Same as match row                                                 |
+| `matches.outcomes`                                              | Ordered outcome keys available to picks                                                | Same as match row                                                 |
+| `matches.points_for_correct`                                    | Points credited for a correct pick                                                     | Same as match row                                                 |
+| `matches.status` / `result`                                     | Open, settled or voided state and final outcome                                        | Same as match row                                                 |
+| `matches.void_reason`                                           | Admin-supplied reason for a postponed or abandoned match                               | Same as match row                                                 |
+| `matches.created_by` / lifecycle fields                         | Admin wallet and UTC create/update/settle/void timestamps                              | Same as match row                                                 |
+| `picks.match_id` / `address`                                    | One current pick per wallet and match                                                  | Follows SR-41 retention and erasure                               |
+| `picks.outcome`                                                 | The wallet's selected match outcome                                                    | Same as pick row                                                  |
+| `picks.signature`                                               | Nullable EIP-712 signature slot; SR-45 owns submission/persistence                     | Deleted with the pick on erasure                                  |
+| `picks.created_at` / `updated_at`                               | Server timestamps used to enforce lock and scoring eligibility                         | Same as pick row                                                  |
+| `prediction_points.match_id` / `address`                        | Match and wallet key for idempotently calculated points                                | Follows SR-41 retention and erasure                               |
+| `prediction_points.points`                                      | Points for a correct pick; wrong picks have no score row                               | Same as score row                                                 |
+| `prediction_points.week_start_utc` / `season_id`                | UTC Monday week and season aggregation keys                                            | Same as score row                                                 |
+| `prediction_points.credited_at`                                 | UTC time the scoring function last calculated this wallet's row                        | Same as score row                                                 |
+| `admin_audit_log.id`                                            | Random UUID identifying an audit event                                                 | Until explicitly deleted under the F-12 policy                    |
+| `admin_audit_log.actor_address`                                 | Lowercase wallet identifying the admin actor                                           | Same as audit row                                                 |
+| `admin_audit_log.action`                                        | Identifier of the admin action                                                         | Same as audit row                                                 |
+| `admin_audit_log.payload`                                       | JSON object containing minimal action metadata                                         | Same as audit row                                                 |
+| `admin_audit_log.created_at`                                    | Time of the admin event, with time zone                                                | Same as audit row                                                 |
+| `predict_age_confirmations.address` / `confirmed_at`            | Wallet's positive 18+ self-confirmation and UTC time; no date of birth                 | Until Predict erasure; approved retention pending                 |
+| `predict_terms_acceptances.address` / `version` / `accepted_at` | Wallet, terms version and first UTC acceptance time                                    | Until Predict erasure; approved retention pending                 |
+| `predict_terms_acceptances.country` / `country_check`           | Trusted platform country code or null, and allowed/unknown result; never raw IP        | Same as acceptance row                                            |
+| `predict_nonces.nonce` / `address` / `expires_at`               | Wallet-linked replay-protection storage for SR-45                                      | Until Predict erasure; expiry is not automatic deletion           |
+| `predict_rate_limits.address` / `count` / `expires_at`          | Shared authenticated acceptance limit; count resets after a minute on the next request | Until Predict erasure; operational purge policy pending           |
+| `prediction_audit.id` / `match_id` / `outcome` / `created_at`   | Pick event metadata; SR-45 owns event insertion                                        | Retained after erasure; approved retention pending                |
+| `prediction_audit.address` / `signature`                        | Wallet and nullable EIP-712 signature                                                  | Erasure replaces address with keyed pseudonym and nulls signature |
 
 The `matches` table stores off-chain fixture metadata and lifecycle state;
 there are no chain IDs, derived contract match IDs or transaction hashes.
-`picks` currently stores the current pick for each wallet/match without signatures or
-nonces; SR-45 owns those fields. The intended Predict record includes the wallet
+SR-41 adds nullable signature storage, a wallet-linked nonce table and a Predict
+audit table; SR-45 owns submission, signature verification and event insertion.
+The intended Predict record includes the wallet
 address, pick, EIP-712 signature and timestamps in Postgres. Picks use a free
 wallet signature, with no gas or on-chain submission. They support submission
 verification, deadline enforcement and scoring. The lawful basis is pending
 legal review; the draft retention value is `LEGAL_DETAILS.retention` in
 `apps/web/src/copy/names.ts`. The revised draft policy requires Predict aggregates
 to be anonymised after 24 months; other retention periods remain unconfirmed.
-The intended append-only Predict audit log records picks and signatures for
-accountability. Erasure deletes picks, terms-acceptance records and stored
-signatures, and pseudonymises audit-log entries, which are kept.
-The terms-acceptance record contains wallet address, terms version, UTC time,
-country-check result. The IP country check is done on our server; raw IP is not
-stored. These are draft processing requirements, not claims that the current
-schema implements signature persistence, a Predict audit log, terms acceptance,
-country checking, anonymisation or erasure.
+The Predict audit log is append-only except for erasure. `erasePredictData`
+deletes picks, points, terms/18+ records, wallet-linked Predict/SIWE nonces and
+acceptance rate-limit rows in one transaction. Audit signatures are removed;
+audit wallet columns and fixture admin-wallet metadata are pseudonymised with
+HMAC-SHA-256 using server-only `PREDICT_ERASURE_SECRET` (required, at least 32
+characters, never committed). Identifying admin audit payloads are redacted
+entirely, including signature copies and mixed-case wallet references.
+Retained keyed pseudonyms are not claimed to be anonymous.
+The acceptance endpoints require SIWE, same Origin and a shared Postgres rate
+limit before acceptance work. Terms records include country code/result from
+the trusted platform, never client country or raw IP. Unknown countries fail
+closed in production. These processing/retention policies remain draft; no
+automatic anonymisation or submission route is added. See
+[Predict guardrails](legal/predictions-guardrails.md) and
+[DPIA screening](legal/predict-dpia-screening.md).
 `prediction_points` is replaced by the
 idempotent SR-44 scoring function and stores only correct picks. Their
 retention, erasure and backup disposal follow SR-41; SR-44 adds no automatic
@@ -81,7 +98,8 @@ SR-44 audit actions are `matches.create`, `matches.edit`, `matches.settle`,
 `matches.void` and `matches.credit`. Each payload contains before/after state;
 scoring actions also include the correct-pick count and total points. Audit
 rows are written in the same transaction as the corresponding database action,
-and the database rejects updates and deletes. They do not store SIWE messages,
+and the database rejects updates and deletes except the SR-41 erasure redaction.
+They do not store SIWE messages,
 signatures, official-source page contents or raw provider errors.
 
 Audit writers must allowlist payload fields per action, not dump request
@@ -204,7 +222,8 @@ packages/scripts and duplicated shared legal placeholders.
   work. This action needs no RPC call or on-chain transaction.
 - **Deletion:** atomically delete the profile row (`address`, `username`,
   `show_holdings`, `claimed_chain_id`, `claimed_at`, `updated_at`), all picks
-  belonging to that wallet, terms-acceptance records, their stored signatures
+  belonging to that wallet, terms-acceptance and 18+ records, wallet-linked
+  nonces, acceptance rate-limit rows and their stored signatures
   (including future SR-45 signature/nonce records) and related
   `prediction_points` rows. Pseudonymise the wallet's audit-log entries, which
   are kept. Remove identifying wallet addresses and payload references; all
@@ -224,10 +243,10 @@ packages/scripts and duplicated shared legal placeholders.
 - **Limits:** on-chain transactions, balances and history cannot be erased.
   Fixture metadata is not deleted by this profile action. Audit-log entries
   are kept but must be pseudonymised as above, not left identifiable. The current
-  database rejects updates/deletes on `admin_audit_log`; the future implementation
-  must reconcile append-only history with erasure, including removable identifying
-  payloads/signatures, before this contract is available. No immutable-audit
-  constraint is relaxed in this ticket. Predict aggregates must be anonymised
+  database rejects audit updates/deletes/truncation except the narrow SR-41
+  erasure operation, which redacts identifying payloads/signatures. SR-23 must
+  coordinate profile deletion atomically with `erasePredictData` before this
+  endpoint is available; no endpoint is built in SR-41. Predict aggregates must be anonymised
   after 24 months; retention periods for retained pseudonymised audit entries,
   picks, signatures and terms records remain pending confirmation.
   No automatic database TTL exists; production must separately approve and

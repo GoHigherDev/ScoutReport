@@ -99,6 +99,7 @@ describe('SR-44 off-chain schema', () => {
       'match_id',
       'address',
       'outcome',
+      'signature',
       'created_at',
       'updated_at',
     ])

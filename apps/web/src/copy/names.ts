@@ -15,7 +15,7 @@ export const NAMES = {
     contact: 'Privacy contact',
     privacyHeading: 'Privacy notice',
     termsHeading: 'Terms',
-    revision: 'Last updated: 14 October 2026 · Version: 0.2',
+    revision: 'Last updated: 14 October 2026 · Version: 0.3',
     ageNotice:
       "For users 18 or over; we do not knowingly process children's data.",
     privacySections: [
@@ -33,7 +33,7 @@ export const NAMES = {
       },
       {
         heading: 'Off-chain Predict',
-        text: 'Picks are free and wallet-signed using EIP-712: a wallet signature is required, with no gas and no on-chain transaction. Postgres stores the wallet address, pick, signature and timestamps to verify the submission, enforce pick deadlines and calculate non-transferable prediction points. An append-only audit log records picks and signatures for accountability. [LAWFUL BASIS FOR PREDICT — TO BE CONFIRMED]. On erasure, we delete your picks, prediction points, terms-acceptance records and stored signatures, and pseudonymise your audit-log entries, which are kept. Contact the privacy contact to request erasure.',
+        text: 'Picks are free and wallet-signed using EIP-712: a wallet signature is required, with no gas and no on-chain transaction. Postgres stores the wallet address, pick, signature and timestamps to verify the submission, enforce pick deadlines and calculate non-transferable prediction points. An append-only audit log records picks and signatures for accountability, with an exception for erasure. [LAWFUL BASIS FOR PREDICT — TO BE CONFIRMED]. On erasure, we delete your picks, prediction points, terms-acceptance and 18+ records, wallet-linked nonces and stored signatures, and pseudonymise your audit-log entries, which are kept. Contact the privacy contact to request erasure.',
       },
       {
         heading: 'Retention',
@@ -53,7 +53,7 @@ export const NAMES = {
       },
       {
         heading: 'Terms acceptance and country check',
-        text: 'The terms-acceptance record contains your wallet address, the terms version, the UTC time and the country-check result. We use it to record which terms you accepted and to check eligibility. The IP country check is done on our server; raw IP is not stored. [LAWFUL BASIS FOR TERMS ACCEPTANCE AND COUNTRY CHECK — TO BE CONFIRMED]. Contact the privacy contact for questions about these records.',
+        text: 'The terms-acceptance record contains your wallet address, the terms version, the UTC time, the country code where available and the country-check result. We also record your 18+ confirmation and its UTC time, not your date of birth. We use these records to check eligibility. The country check is done on our server; raw IP is not stored. [LAWFUL BASIS FOR TERMS ACCEPTANCE AND COUNTRY CHECK — TO BE CONFIRMED]. Contact the privacy contact for questions about these records.',
       },
       {
         heading: 'Automated decisions',
@@ -91,7 +91,19 @@ export const NAMES = {
         heading: '18+ eligibility',
         text: 'You must be 18 or over to use ScoutReport.',
       },
+      {
+        heading: 'Free-to-play Predict',
+        text: 'You must confirm that you are 18 or over and accept the current terms before submitting a pick. Predict is unavailable in restricted countries; eligibility is checked on our server for each submission. No CHZ, Fan Tokens or Reward Points are required. Prediction points have no cash value, are non-transferable and cannot be redeemed. No prizes are offered. [PREDICT ELIGIBILITY AND COUNTRY RESTRICTIONS — FOR COUNSEL TO CONFIRM]. This draft is not legal advice.',
+      },
     ],
+  },
+  predict: {
+    freeToPlayBanner: '[FREE_TO_PLAY_BANNER]',
+    sessionRequired: 'Sign in to confirm your eligibility.',
+    ageRequired: 'Confirm that you are 18 or over before submitting a pick.',
+    termsRequired: 'Accept the current terms before submitting a pick.',
+    countryUnavailable: 'Predict is unavailable in your location.',
+    originRequired: 'Submit this request from the ScoutReport site.',
   },
   admin: {
     heading: 'Admin matches',

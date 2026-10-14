@@ -17,7 +17,21 @@ jobs:
     name: web+packages
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: scoutreport_predict_test
+          POSTGRES_PASSWORD: local-only-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s --health-timeout 5s --health-retries 5
     env:
+      # Disposable local service only, not a deployment credential.
+      PREDICT_TEST_DATABASE_URL: postgresql://postgres@localhost:5432/scoutreport_predict_test
+      PGPASSWORD: local-only-ci
       TURBO_TELEMETRY_DISABLED: '1'
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
