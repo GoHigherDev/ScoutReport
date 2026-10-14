@@ -37,7 +37,12 @@ describe('static legal drafts', () => {
     expect(
       screen.getByText(NAMES.legal.privacySections[3].text),
     ).toHaveTextContent(
-      'we delete your picks, terms-acceptance records and stored signatures, and pseudonymise your audit-log entries, which are kept.',
+      'we delete your picks, prediction points, terms-acceptance records and stored signatures, and pseudonymise your audit-log entries, which are kept.',
+    )
+    expect(
+      screen.getByText(NAMES.legal.privacySections[1].text),
+    ).toHaveTextContent(
+      'Erasure deletes off-chain profile fields, picks, prediction points, terms-acceptance records and stored signatures;',
     )
     expect(
       screen.getByText((text) => text.includes(LEGAL_DETAILS.retention)),
@@ -86,7 +91,10 @@ describe('static legal drafts', () => {
       "If you declare a Socios Wallet, that choice is saved in this browser's local storage until you change it or clear site storage.",
     )
     expect(sections[cookiesIndex].text).toContain(
-      'Your Socios Wallet declaration is stored in your browser. Read caches last',
+      'until you change it or clear site storage. Read caches last',
+    )
+    expect(sections[cookiesIndex].text).not.toContain(
+      'Your Socios Wallet declaration is stored in your browser.',
     )
     expect(sections[cookiesIndex].text).not.toMatch(
       /Reported RP is sent|RP Estimate panel/,

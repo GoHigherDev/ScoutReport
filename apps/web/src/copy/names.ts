@@ -25,7 +25,7 @@ export const NAMES = {
       },
       {
         heading: 'Wallet addresses and public history',
-        text: 'A wallet address can be personal data when linked to a person, as discussed in ICO guidance on distributed ledger technology. Truncating an address does not make it anonymous. Chiliz Chain history is public and cannot be erased by ScoutReport. Erasure deletes off-chain profile fields, picks, terms-acceptance records and stored signatures; audit-log entries are pseudonymised and kept. Transactions and history on-chain cannot be deleted.',
+        text: 'A wallet address can be personal data when linked to a person, as discussed in ICO guidance on distributed ledger technology. Truncating an address does not make it anonymous. Chiliz Chain history is public and cannot be erased by ScoutReport. Erasure deletes off-chain profile fields, picks, prediction points, terms-acceptance records and stored signatures; audit-log entries are pseudonymised and kept. Transactions and history on-chain cannot be deleted.',
       },
       {
         heading: 'Lawful bases',
@@ -33,7 +33,7 @@ export const NAMES = {
       },
       {
         heading: 'Off-chain Predict',
-        text: 'Picks are free and wallet-signed using EIP-712: a wallet signature is required, with no gas and no on-chain transaction. Postgres stores the wallet address, pick, signature and timestamps to verify the submission, enforce pick deadlines and calculate non-transferable prediction points. An append-only audit log records picks and signatures for accountability. [LAWFUL BASIS FOR PREDICT — TO BE CONFIRMED]. On erasure, we delete your picks, terms-acceptance records and stored signatures, and pseudonymise your audit-log entries, which are kept. Contact the privacy contact to request erasure.',
+        text: 'Picks are free and wallet-signed using EIP-712: a wallet signature is required, with no gas and no on-chain transaction. Postgres stores the wallet address, pick, signature and timestamps to verify the submission, enforce pick deadlines and calculate non-transferable prediction points. An append-only audit log records picks and signatures for accountability. [LAWFUL BASIS FOR PREDICT — TO BE CONFIRMED]. On erasure, we delete your picks, prediction points, terms-acceptance records and stored signatures, and pseudonymise your audit-log entries, which are kept. Contact the privacy contact to request erasure.',
       },
       {
         heading: 'Retention',
@@ -45,7 +45,7 @@ export const NAMES = {
       },
       {
         heading: 'Cookies and browser storage',
-        text: "ScoutReport uses only an essential sign-in session cookie, with httpOnly, Secure and SameSite=Lax settings. No analytics or tracking is enabled; any future non-essential tracking would require prior consent. Wallet connection libraries may use browser storage to maintain a connection. If you declare a Socios Wallet, that choice is saved in this browser's local storage until you change it or clear site storage. Your Socios Wallet declaration is stored in your browser. Read caches last only for the browser context or until evicted.",
+        text: "ScoutReport uses only an essential sign-in session cookie, with httpOnly, Secure and SameSite=Lax settings. No analytics or tracking is enabled; any future non-essential tracking would require prior consent. Wallet connection libraries may use browser storage to maintain a connection. If you declare a Socios Wallet, that choice is saved in this browser's local storage until you change it or clear site storage. Read caches last only for the browser context or until evicted.",
       },
       {
         heading: 'Reported RP and estimates',
