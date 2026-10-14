@@ -15,14 +15,17 @@ export const NAMES = {
     contact: 'Privacy contact',
     privacyHeading: 'Privacy notice',
     termsHeading: 'Terms',
+    revision: 'Last updated: 14 October 2026 · Version: 0.2',
+    ageNotice:
+      "For users 18 or over; we do not knowingly process children's data.",
     privacySections: [
       {
         heading: 'Data collected and purposes',
-        text: 'ScoutReport uses a wallet address to identify a profile and verify sign-in. Off-chain profile fields include an optional public name, a holdings-display preference, claim chain and time, and the latest update time. Sign-in uses a single-use nonce, wallet signature and message; signatures and messages are not logged. Public wallet balances and staking history are read from Chiliz Chain to display holdings and estimates; they are not stored in the profile database.',
+        text: 'ScoutReport uses a wallet address to identify a profile and verify sign-in. Off-chain profile fields include an optional public name, a holdings-display preference, claim chain and time, and the latest update time. A wallet signature is required to sign in; signing in costs no gas and does not move funds. Sign-in uses a single-use nonce and message; sign-in signatures and messages are not logged. Public Chiliz Chain records are the source of wallet balances and staking history used to display holdings and estimates; they are not stored in the profile database.',
       },
       {
         heading: 'Wallet addresses and public history',
-        text: 'A wallet address can be personal data when linked to a person, as discussed in ICO guidance on distributed ledger technology. Truncating an address does not make it anonymous. Chiliz Chain history is public and cannot be erased by ScoutReport. Erasure can delete off-chain profile fields and stored picks and signatures, not transactions or history on-chain.',
+        text: 'A wallet address can be personal data when linked to a person, as discussed in ICO guidance on distributed ledger technology. Truncating an address does not make it anonymous. Chiliz Chain history is public and cannot be erased by ScoutReport. Erasure deletes off-chain profile fields, picks, terms-acceptance records and stored signatures; audit-log entries are pseudonymised and kept. Transactions and history on-chain cannot be deleted.',
       },
       {
         heading: 'Lawful bases',
@@ -30,19 +33,27 @@ export const NAMES = {
       },
       {
         heading: 'Off-chain Predict',
-        text: 'Picks are free and wallet-signed using EIP-712: a free signature, no gas and no on-chain transaction. The intended Postgres record contains the wallet address, pick, signature and timestamps, to verify the submission, enforce pick deadlines and calculate non-transferable prediction points. [LAWFUL BASIS FOR PREDICT — TO BE CONFIRMED]. Erasure deletes stored picks and their signatures. Signature persistence is part of SR-45; the current pick schema has no signature field. Terms-acceptance records and audit-log details remain placeholders for SR-41 / P-01.',
+        text: 'Picks are free and wallet-signed using EIP-712: a wallet signature is required, with no gas and no on-chain transaction. Postgres stores the wallet address, pick, signature and timestamps to verify the submission, enforce pick deadlines and calculate non-transferable prediction points. An append-only audit log records picks and signatures for accountability. [LAWFUL BASIS FOR PREDICT — TO BE CONFIRMED]. On erasure, we delete your picks, terms-acceptance records and stored signatures, and pseudonymise your audit-log entries, which are kept. Contact the privacy contact to request erasure.',
       },
       {
         heading: 'Retention',
-        text: 'Profile fields currently remain until explicitly deleted or replaced; no automatic profile purge is implemented. Sign-in nonces expire after ten minutes and expired rows are deleted when another nonce is issued, not by a scheduled purge. The session cookie expires after seven days or is cleared on logout. Predict picks and signatures have a retention period awaiting confirmation. Backup disposal and hosting-log retention also await confirmation; expiry alone does not delete database rows.',
+        text: 'Profile fields remain until deleted or replaced. Sign-in nonces expire after ten minutes; expired records are deleted when another nonce is issued. The session cookie expires after seven days or is cleared on logout. Predict aggregates are anonymised after 24 months. Retention periods for picks, signatures, terms-acceptance records and kept pseudonymised audit-log entries await confirmation. Backup disposal and hosting-log retention also await confirmation. Contact the privacy contact for retention questions.',
       },
       {
         heading: 'Profile display',
-        text: 'Addresses are truncated by default. Public names are shown only for claimed, visible profiles. Public holdings display requires an explicit opt-in; the profile preference and erasure controls will be implemented in SR-23 / S-05. The connected-wallet portfolio is a private view, not a public profile.',
+        text: 'Addresses are truncated by default. Public names are shown only for claimed, visible profiles. Public holdings display requires an explicit opt-in. The connected-wallet portfolio is a private view, not a public profile. Contact the privacy contact to request a change to your profile or holdings-display preference.',
       },
       {
         heading: 'Cookies and browser storage',
-        text: 'ScoutReport uses only an essential sign-in session cookie, with httpOnly, Secure and SameSite=Lax settings. No analytics or tracking is enabled; any future non-essential tracking would require prior consent. Wallet connection libraries may use browser storage to maintain a connection. The optional Reward Point declaration is stored only in this browser, per wallet, until changed or site storage is cleared; it is not transmitted. Read caches last only for the browser context or until evicted.',
+        text: 'ScoutReport uses only an essential sign-in session cookie, with httpOnly, Secure and SameSite=Lax settings. No analytics or tracking is enabled; any future non-essential tracking would require prior consent. Wallet connection libraries may use browser storage to maintain a connection. Reported RP is sent only with your consent, which you can withdraw by contacting the privacy contact. The RP Estimate panel shows holdings only and assumes a Socios Wallet based on your declaration; that declaration is not verification. Read caches last only for the browser context or until evicted.',
+      },
+      {
+        heading: 'Terms acceptance and country check',
+        text: 'The terms-acceptance record contains wallet address, terms version, UTC time, country-check result, to record which terms were accepted and check eligibility. The IP country check is done on our server; raw IP is not stored. [LAWFUL BASIS FOR TERMS ACCEPTANCE AND COUNTRY CHECK — TO BE CONFIRMED]. Contact the privacy contact for questions about these records.',
+      },
+      {
+        heading: 'Automated decisions',
+        text: 'We make no solely automated decisions with legal or similarly significant effects.',
       },
       {
         heading: 'Recipients and infrastructure',
@@ -50,7 +61,7 @@ export const NAMES = {
       },
       {
         heading: 'Your rights and requests',
-        text: 'You can contact the privacy contact to request access, correction, erasure, restriction or portability of your personal data, or to object to processing. Where processing relies on consent, you can withdraw it. The applicable rights and any limits depend on the processing and lawful basis, which remain under review. Wallet control must be verified without requesting private keys. DELETE /api/profile is a documented future contract, not an available endpoint; SR-23 will implement it.',
+        text: 'You can contact the privacy contact to request access, correction, erasure, restriction or portability of your personal data. You have the right to object to processing, subject to the applicable lawful basis and limits. Where processing relies on consent, you can withdraw it. The applicable rights and any limits depend on the processing and lawful basis, which remain under review. A wallet signature is required to verify wallet control when handling your request; we never request private keys.',
       },
       {
         heading: 'Complaints',
@@ -70,7 +81,11 @@ export const NAMES = {
       },
       {
         heading: 'Draft scope',
-        text: 'This is a terms stub pending legal review. [SERVICE TERMS, ELIGIBILITY AND GOVERNING LAW — TO BE CONFIRMED]. Predict picks are free, off-chain and wallet-signed with no gas. Full Predict terms and terms-acceptance records will be completed in SR-41 / P-01.',
+        text: 'These terms are a draft pending legal review. [SERVICE TERMS, ELIGIBILITY AND GOVERNING LAW — TO BE CONFIRMED]. A wallet signature is required to sign in; signing in costs no gas and does not move funds. Predict picks are free, off-chain and wallet-signed with no gas. We record wallet address, terms version, UTC time, country-check result when you accept the terms. The IP country check is done on our server; raw IP is not stored. Contact the privacy contact with questions about the terms or your records.',
+      },
+      {
+        heading: '18+ eligibility',
+        text: 'You must be 18 or over to use ScoutReport.',
       },
     ],
   },

@@ -16,6 +16,8 @@ export function LegalNotice({
     <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
       <h1 className="text-3xl font-bold">{heading}</h1>
       <Banner variant="warning">{NAMES.legal.draft}</Banner>
+      <p className="text-sm text-sr-muted">{NAMES.legal.revision}</p>
+      <p>{NAMES.legal.ageNotice}</p>
       <dl className="space-y-2">
         <dt className="font-semibold">{NAMES.legal.controller}</dt>
         <dd>{details.controller}</dd>
