@@ -112,11 +112,12 @@ they are not provided by this erasure function.
   `[PREDICT ELIGIBILITY AND COUNTRY RESTRICTIONS — FOR COUNSEL TO CONFIRM]`
   clause; no legal clauses or approvals are inferred.
 - All new public copy is in `NAMES` in `apps/web/src/copy/names.ts`. The terms
-  banner displays the `[FREE_TO_PLAY_BANNER]` key for copy-owner review;
+  banner uses the copy-owner-approved `NAMES.predict.freeToPlayBanner` text;
   SR-45 will consume the same copy for its interface.
 - Counsel confirms country restrictions, eligibility, terms, lawful bases,
   retention, providers/transfers and the [DPIA screening](predict-dpia-screening.md)
-  before merge/release. Copy owner reviews the PR's “Copy for review” section.
+  before merge/release. Copy owner signed off the new strings on 14 October 2026;
+  legal wording remains under separate Legal & Compliance review.
 - AppKit analytics remains off. The SR-17 tracker guardrail still applies.
 - No prize fulfilment, sponsorship, Mainnet writes, deployment or contracts
   form part of this ticket.
@@ -127,7 +128,7 @@ they are not provided by this erasure function.
 draft blocked country, unknown/untrusted production country, zero-asset
 eligibility without RPC/RP lookup, Origin/session rejection before DB work,
 rate limits and no prize implementation/configuration. `legal-pages.test.tsx`
-checks the draft pages, free-to-play placeholder and valueless points.
+checks the draft pages, approved free-to-play banner and valueless points.
 
 `predict.integration.test.ts` applies real migrations to a **disposable**
 Postgres database and tests real encrypted sessions, the shared rate limit,

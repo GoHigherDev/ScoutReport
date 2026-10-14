@@ -98,12 +98,14 @@ export const NAMES = {
     ],
   },
   predict: {
-    freeToPlayBanner: '[FREE_TO_PLAY_BANNER]',
+    freeToPlayBanner:
+      "Predict is free to play. You don't need CHZ, Fan Tokens or Reward Points. Prediction points have no cash value and can't be transferred or redeemed. No prizes are offered.",
     sessionRequired: 'Sign in to confirm your eligibility.',
     ageRequired: 'Confirm that you are 18 or over before submitting a pick.',
     termsRequired: 'Accept the current terms before submitting a pick.',
     countryUnavailable: 'Predict is unavailable in your location.',
-    originRequired: 'Submit this request from the ScoutReport site.',
+    originRequired:
+      "This request didn't come from the ScoutReport site. Refresh the page and try again.",
   },
   admin: {
     heading: 'Admin matches',

@@ -128,10 +128,10 @@ describe('static legal drafts', () => {
     )
   })
 
-  it('shows the free-to-play placeholder and valueless, non-transferable points', () => {
+  it('shows the approved free-to-play banner and valueless, non-transferable points', () => {
     render(<TermsPage />)
     expect(screen.getByText(NAMES.predict.freeToPlayBanner)).toHaveTextContent(
-      '[FREE_TO_PLAY_BANNER]',
+      "Predict is free to play. You don't need CHZ, Fan Tokens or Reward Points. Prediction points have no cash value and can't be transferred or redeemed. No prizes are offered.",
     )
     expect(screen.getByRole('main')).toHaveTextContent(
       'No CHZ, Fan Tokens or Reward Points are required.',
