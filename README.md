@@ -417,6 +417,26 @@ See [ADR 0002](docs/adr/0002-gas-sponsorship.md): paymaster and account
 abstraction are **LATER**, subject to re-checking current Chiliz/Biconomy
 guidance.
 
+## Admin match management (SR-44)
+
+`/admin/matches` requires a verified SIWE session in `ADMIN_ADDRESSES`. Admins
+can save football/CS2 match metadata with optional Fan Token key mappings,
+Europe/London input converted to UTC, ordered outcomes and an explicit points
+setting. Apply the new matches migration with `pnpm db:migrate`.
+
+Browser-signed creation, settlement, voiding and sequential credit batches
+reuse `TransactionButton` and its gas/network guard. Writes are Spicy-only.
+The pending predictions deployment record is unchanged: transaction actions
+remain disabled until an approved address is recorded and the app rebuilt.
+Production APIs retain the existing fail-closed rate-limit requirement pending
+SR-72; no production limiter or server-held signing key is added.
+
+Metadata saves and verified transaction receipts use `admin_audit_log`, with
+receipt hashes in its payload and retry/recovery controls in the console.
+See the [settlement runbook](docs/runbooks/settlement.md) for official-result
+verification, immutable settlement, resumable crediting, subgraph/leaderboard
+checks, voids and disputes. All new console copy is under `NAMES.admin`.
+
 ## Repository map
 
 | Path                 | Purpose                                               |

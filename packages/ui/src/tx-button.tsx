@@ -38,6 +38,7 @@ export type TxButtonProps = Omit<
   explorerUrl: (hash: string) => string
   decodeError: (error: unknown) => string
   insufficientGasPanel?: ReactNode
+  onBusyChange?: (busy: boolean) => void
 }
 
 export function TxButton({
@@ -48,6 +49,7 @@ export function TxButton({
   explorerUrl,
   decodeError,
   insufficientGasPanel,
+  onBusyChange,
   disabled,
   ...props
 }: TxButtonProps) {
@@ -61,6 +63,7 @@ export function TxButton({
   async function act() {
     if (running.current || disabled || hash) return
     running.current = true
+    onBusyChange?.(true)
     setError(undefined)
     setInsufficientGas(false)
     setState('checking')
@@ -91,6 +94,7 @@ export function TxButton({
       setState('failed')
     } finally {
       running.current = false
+      onBusyChange?.(false)
     }
   }
 

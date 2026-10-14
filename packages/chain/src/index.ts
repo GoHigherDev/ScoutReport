@@ -17,6 +17,8 @@ export type {
 export { decodeTxError, SCOUTREPORT_ABIS } from './tx-errors.ts'
 export {
   DEPLOYMENT_ADDRESSES,
+  getPredictionsAddress,
+  readPredictionsAddress,
   readDeploymentAddresses,
   type DeploymentAddresses,
   type MockContractName,

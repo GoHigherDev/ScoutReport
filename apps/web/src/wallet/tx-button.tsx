@@ -28,11 +28,18 @@ export type TransactionButtonProps = Pick<
 > & {
   request: GuardedTxRequest
   label?: string
+  onReceipt?: (hash: Hash, status: 'success' | 'reverted') => Promise<void>
+  onBusyChange?: (busy: boolean) => void
+  onSubmitted?: (hash: Hash) => void
+  expectedAccount?: Address
 }
 
 export function TransactionButton({
   request,
   label,
+  onReceipt,
+  onSubmitted,
+  expectedAccount,
   ...props
 }: TransactionButtonProps) {
   const config = useConfig()
@@ -46,6 +53,12 @@ export function TransactionButton({
       labels={{ ...NAMES.gas, idle: label ?? NAMES.gas.idle }}
       guard={async () => {
         const wallet = getAccount(config)
+        if (
+          expectedAccount &&
+          wallet.address?.toLowerCase() !== expectedAccount.toLowerCase()
+        ) {
+          return { ok: false, reason: 'unknown' }
+        }
         const result = await guard()
         guardedAddress.current = result.ok ? wallet.address : undefined
         return result
@@ -64,7 +77,13 @@ export function TransactionButton({
         if (current.address !== address) {
           throw new Error(NAMES.gas.unknown)
         }
-        return wallet.sendTransaction({ ...request, account: address, chain })
+        const hash = await wallet.sendTransaction({
+          ...request,
+          account: address,
+          chain,
+        })
+        onSubmitted?.(hash)
+        return hash
       }}
       waitForReceipt={async (hash) => {
         let replaced = false
@@ -76,6 +95,9 @@ export function TransactionButton({
             replaced ||= reason !== 'repriced'
           },
         })
+        if (!replaced) {
+          await onReceipt?.(receipt.transactionHash, receipt.status)
+        }
         return { ...receipt, status: replaced ? 'reverted' : receipt.status }
       }}
       explorerUrl={(hash) => explorerTxUrl(chain.id, hash)}

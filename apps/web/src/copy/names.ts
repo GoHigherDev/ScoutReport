@@ -3,6 +3,68 @@ const externalWalletCaveat =
 
 export const NAMES = {
   product: 'ScoutReport',
+  admin: {
+    heading: 'Admin matches',
+    accessRequired: 'Sign in with an approved admin wallet to manage matches.',
+    forbidden: 'This session does not have admin access.',
+    refresh: 'Refresh matches',
+    reopen: 'Open the console after signing in',
+    unavailable:
+      'On-chain match actions and settlement are unavailable until an approved Spicy deployment is recorded.',
+    walletMismatch: 'Connect the wallet used for this admin session.',
+    newMatch: 'New match',
+    sport: 'Sport',
+    football: 'Football',
+    cs2: 'CS2',
+    sideOne: 'First side',
+    sideTwo: 'Second side',
+    tokenKey: 'Fan Token key',
+    noToken: 'No Fan Token mapping',
+    kickoff: 'Kickoff (Europe/London)',
+    lockTime: 'Lock time (Europe/London; defaults to kickoff)',
+    timeHelp:
+      'Times are stored in UTC. Invalid or ambiguous UK clock-change times are not accepted.',
+    outcomes: 'Outcomes (one per line; two or three)',
+    points: 'Non-transferable points for a correct pick (1–100)',
+    save: 'Save match metadata',
+    saved: 'Metadata saved. The match is not on-chain until creation confirms.',
+    empty: 'No matches saved.',
+    error: 'Unable to complete this action. Check the input and try again.',
+    invalidInput: 'Check the match details and UK times before saving.',
+    create: 'Create match on Spicy',
+    settle: 'Settle match',
+    void: 'Void match',
+    credit: 'Credit next batch',
+    result: 'Result',
+    confirmHeading: 'Confirm match action',
+    confirmHelp:
+      'Check the match and result against an official source. Settlement is final and cannot be corrected or voided.',
+    voidHelp: 'Voiding an open match is final. No points will be credited.',
+    creditHelp:
+      'Credit batches process up to 50 predictors. Confirm each batch in your wallet until complete.',
+    cancel: 'Cancel',
+    retryAudit: 'Retry audit recording',
+    auditError:
+      'Audit recording failed. Check the transaction receipt, then retry recording before continuing.',
+    receiptPending:
+      'A transaction was sent. Wait for its receipt and record its audit before continuing. If it was cancelled, check the explorer and refresh.',
+    resumeHelp:
+      'Refresh to recover on-chain state. If a transaction is still pending, wait for its receipt before retrying.',
+    recoveryHash: 'Transaction hash to recover',
+    recoverAudit: 'Record a previous transaction',
+    recoveryHelp:
+      'Choose the action and enter its transaction hash. The server verifies the transaction before recording it.',
+    action: 'Action',
+    loading: 'Loading match state…',
+    draft: 'Metadata only',
+    open: 'Open',
+    settled: 'Settled',
+    voided: 'Voided',
+    complete: 'Crediting complete',
+    progress: 'Predictors processed',
+    lockedUntil: 'Lock time (UTC)',
+    kickoffUtc: 'Kickoff (UTC)',
+  },
   auth: {
     statement: 'Sign in to ScoutReport. This does not cost gas or move funds.',
     sessionRequired: 'A session is required',

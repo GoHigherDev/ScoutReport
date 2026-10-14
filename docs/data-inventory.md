@@ -8,7 +8,8 @@ SR-14 adds SIWE nonce writes and encrypted browser sessions, not profile writes.
 
 ## Persistent fields
 
-There are no profile or admin write routes. SIWE enforces single use and a
+There are no profile write routes. SR-44 adds session/allowlist-gated admin match
+metadata and verified transaction audit writes. SIWE enforces single use and a
 ten-minute nonce expiry; new nonce issuance deletes already-expired rows,
 including consumed rows. There is no scheduled deletion or automatic database
 TTL, so expired rows remain until another nonce is issued. The following
@@ -17,28 +18,40 @@ retention policy. F-12 must define and implement
 production retention, erasure and backup disposal before personal data is
 collected in production. Expiry timestamps alone do not delete rows.
 
-| Table / field                   | Purpose                                                               | Current retention                                                      |
-| ------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `profiles.address`              | Lowercase wallet address; profile primary key                         | Until profile row is explicitly deleted                                |
-| `profiles.username`             | Optional public alias; case-insensitive uniqueness through `citext`   | Until replaced, cleared or profile deleted                             |
-| `profiles.show_holdings`        | Opt-in display preference; defaults to false, not a holdings snapshot | Until preference changed or profile deleted                            |
-| `profiles.claimed_chain_id`     | Optional chain identifier associated with a profile claim             | Until cleared/replaced or profile deleted                              |
-| `profiles.claimed_at`           | Optional time of profile claim, with time zone                        | Until cleared/replaced or profile deleted                              |
-| `profiles.updated_at`           | Time of the latest profile change, with time zone                     | Until overwritten or profile deleted                                   |
-| `siwe_nonces.nonce`             | Unique challenge for SIWE replay protection                           | Deleted on nonce issuance after its ten-minute expiry                  |
-| `siwe_nonces.created_at`        | Time the challenge was created                                        | Same as nonce row                                                      |
-| `siwe_nonces.expires_at`        | Deadline after which auth rejects the challenge                       | Same as nonce row; no scheduled purge                                  |
-| `siwe_nonces.used_at`           | Optional consumption time to prevent reuse                            | Same as nonce row                                                      |
-| `admin_audit_log.id`            | Random UUID identifying an audit event                                | Until explicitly deleted under the F-12 policy                         |
-| `admin_audit_log.actor_address` | Lowercase wallet identifying the admin actor                          | Same as audit row                                                      |
-| `admin_audit_log.action`        | Identifier of the admin action                                        | Same as audit row                                                      |
-| `admin_audit_log.payload`       | JSON object containing minimal action metadata                        | Same as audit row                                                      |
-| `admin_audit_log.created_at`    | Time of the admin event, with time zone                               | Same as audit row                                                      |
+| Table / field                   | Purpose                                                               | Current retention                                     |
+| ------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------- |
+| `profiles.address`              | Lowercase wallet address; profile primary key                         | Until profile row is explicitly deleted               |
+| `profiles.username`             | Optional public alias; case-insensitive uniqueness through `citext`   | Until replaced, cleared or profile deleted            |
+| `profiles.show_holdings`        | Opt-in display preference; defaults to false, not a holdings snapshot | Until preference changed or profile deleted           |
+| `profiles.claimed_chain_id`     | Optional chain identifier associated with a profile claim             | Until cleared/replaced or profile deleted             |
+| `profiles.claimed_at`           | Optional time of profile claim, with time zone                        | Until cleared/replaced or profile deleted             |
+| `profiles.updated_at`           | Time of the latest profile change, with time zone                     | Until overwritten or profile deleted                  |
+| `siwe_nonces.nonce`             | Unique challenge for SIWE replay protection                           | Deleted on nonce issuance after its ten-minute expiry |
+| `siwe_nonces.created_at`        | Time the challenge was created                                        | Same as nonce row                                     |
+| `siwe_nonces.expires_at`        | Deadline after which auth rejects the challenge                       | Same as nonce row; no scheduled purge                 |
+| `siwe_nonces.used_at`           | Optional consumption time to prevent reuse                            | Same as nonce row                                     |
+| `admin_audit_log.id`            | Random UUID identifying an audit event                                | Until explicitly deleted under the F-12 policy        |
+| `admin_audit_log.actor_address` | Lowercase wallet identifying the admin actor                          | Same as audit row                                     |
+| `admin_audit_log.action`        | Identifier of the admin action                                        | Same as audit row                                     |
+| `admin_audit_log.payload`       | JSON object containing minimal action metadata                        | Same as audit row                                     |
+| `admin_audit_log.created_at`    | Time of the admin event, with time zone                               | Same as audit row                                     |
 
-Future audit writers must allowlist payload fields per action, not dump request
+The `matches` table stores the UUID, derived bytes32 match ID, sport, two side
+names and optional Fan Token keys, UTC kickoff/lock time, ordered outcomes,
+points setting and creation timestamp. Rows remain until explicitly deleted
+under an approved retention policy; SR-44 adds no automatic deletion.
+
+SR-44 audit actions are `matches.metadata.create`, `matches.createMatch`,
+`matches.settle`, `matches.creditPoints` and `matches.voidMatch`. Payloads hold
+the match ID and minimal verified transaction details (including tx hash,
+Spicy chain ID, receipt status and action-specific result/batch information).
+Metadata saves have no transaction hash. They do not store SIWE messages,
+signatures, official-source page contents or raw provider errors.
+
+Audit writers must allowlist payload fields per action, not dump request
 bodies or sessions. Do not include nonce values, credentials, emails, IPs,
-unneeded wallet data or raw provider responses in payloads. The schema has no
-approved action types yet; those validators belong to the stories adding writes.
+unneeded wallet data or raw provider responses in payloads. SR-44 validates its
+action types; any future action needs its own validator.
 
 Drizzle additionally stores migration bookkeeping in
 `drizzle.__drizzle_migrations`: `id` (migration row identifier), `hash` (migration
