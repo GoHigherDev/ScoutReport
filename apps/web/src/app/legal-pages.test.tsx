@@ -21,7 +21,9 @@ describe('static legal drafts', () => {
         'Last updated: 14 October 2026 · Version: 0.2',
       )
       const text = screen.getByRole('main').textContent
-      expect(text).not.toMatch(/SR-\d+|S-05|P-01|schema|DELETE \/api\/profile/)
+      expect(text).not.toMatch(
+        /SR-\d+|R-\d+|S-05|P-01|schema|DELETE \/api\/profile/,
+      )
     },
   )
 
@@ -56,8 +58,10 @@ describe('static legal drafts', () => {
       'Predict aggregates are anonymised after 24 months.',
       'The terms-acceptance record contains your wallet address, the terms version, the UTC time and the country-check result. We use it to record which terms you accepted and to check eligibility.',
       'The IP country check is done on our server; raw IP is not stored.',
-      'Reported RP is sent only with your consent, which you can withdraw',
-      'The RP Estimate panel shows holdings only and assumes a Socios Wallet based on your declaration',
+      'Reported RP is sent only with your consent.',
+      'You can withdraw consent at any time by contacting the privacy contact.',
+      'The RP Estimate panel uses your holdings only.',
+      'It assumes this wallet is a Socios Wallet based on your declaration; that declaration is not verification.',
       'no solely automated decisions with legal or similarly significant effects',
       'Public Chiliz Chain records',
       'You have the right to object to processing',
@@ -67,6 +71,33 @@ describe('static legal drafts', () => {
       expect(text).toContain(phrase)
     }
     expect(text).not.toMatch(/never transmitted|not transmitted/)
+  })
+
+  it('separates reported RP from browser storage in the requested order', () => {
+    const sections = NAMES.legal.privacySections
+    const cookiesIndex = sections.findIndex(
+      (section) => section.heading === 'Cookies and browser storage',
+    )
+    expect(sections[cookiesIndex + 1]).toEqual({
+      heading: 'Reported RP and estimates',
+      text: 'Reported RP is sent only with your consent. You can withdraw consent at any time by contacting the privacy contact. The RP Estimate panel uses your holdings only. It assumes this wallet is a Socios Wallet based on your declaration; that declaration is not verification.',
+    })
+    expect(sections[cookiesIndex].text).toContain(
+      "If you declare a Socios Wallet, that choice is saved in this browser's local storage until you change it or clear site storage.",
+    )
+    expect(sections[cookiesIndex].text).toContain(
+      'Your Socios Wallet declaration is stored in your browser. Read caches last',
+    )
+    expect(sections[cookiesIndex].text).not.toMatch(
+      /Reported RP is sent|RP Estimate panel/,
+    )
+    render(<PrivacyPage />)
+    expect(
+      screen.getByRole('heading', { name: 'Reported RP and estimates' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(sections[cookiesIndex + 1].text),
+    ).toBeInTheDocument()
   })
 
   it('includes independence and no-financial-advice terms', () => {

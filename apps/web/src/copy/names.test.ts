@@ -1,6 +1,17 @@
 import { expect, it } from 'vitest'
 import { NAMES } from './names'
 
+it('keeps research and wallet-unavailable copy free of internal references', () => {
+  expect(NAMES.optimiserCopy.earnRoutes.researchLink).toBe(
+    'Research, route evidence and limitations',
+  )
+  expect(NAMES.optimiserCopy.earnRoutes.researchLink).not.toMatch(/R-\d+/)
+  expect(NAMES.wallet.unavailable).toBe(
+    'Wallet connection is unavailable. Please try again later.',
+  )
+  expect(NAMES.wallet.unavailable).not.toMatch(/NEXT_PUBLIC_/)
+})
+
 it('uses the approved off-chain settlement confirmation wording', () => {
   expect(NAMES.admin.confirmHelp).toBe(
     'Check the match and result against an official source before you confirm. Settlement is final, so a settled match cannot be corrected or voided.',

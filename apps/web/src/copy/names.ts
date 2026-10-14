@@ -45,7 +45,11 @@ export const NAMES = {
       },
       {
         heading: 'Cookies and browser storage',
-        text: 'ScoutReport uses only an essential sign-in session cookie, with httpOnly, Secure and SameSite=Lax settings. No analytics or tracking is enabled; any future non-essential tracking would require prior consent. Wallet connection libraries may use browser storage to maintain a connection. Reported RP is sent only with your consent, which you can withdraw by contacting the privacy contact. The RP Estimate panel shows holdings only and assumes a Socios Wallet based on your declaration; that declaration is not verification. Read caches last only for the browser context or until evicted.',
+        text: "ScoutReport uses only an essential sign-in session cookie, with httpOnly, Secure and SameSite=Lax settings. No analytics or tracking is enabled; any future non-essential tracking would require prior consent. Wallet connection libraries may use browser storage to maintain a connection. If you declare a Socios Wallet, that choice is saved in this browser's local storage until you change it or clear site storage. Your Socios Wallet declaration is stored in your browser. Read caches last only for the browser context or until evicted.",
+      },
+      {
+        heading: 'Reported RP and estimates',
+        text: 'Reported RP is sent only with your consent. You can withdraw consent at any time by contacting the privacy contact. The RP Estimate panel uses your holdings only. It assumes this wallet is a Socios Wallet based on your declaration; that declaration is not verification.',
       },
       {
         heading: 'Terms acceptance and country check',
@@ -264,7 +268,7 @@ export const NAMES = {
         'Source-confirmed routes are not confirmation of your eligibility or points received. Other activities remain unconfirmed as RP routes.',
       confirmed: 'Source-confirmed',
       unconfirmed: 'Unconfirmed',
-      researchLink: 'R-01 research, route evidence and limitations',
+      researchLink: 'Research, route evidence and limitations',
       staking: {
         name: 'Fan Token staking via the Socios app',
         howTo:
@@ -308,8 +312,7 @@ export const NAMES = {
   connectWallet: 'Connect wallet',
   wallet: {
     disconnect: 'Disconnect',
-    unavailable:
-      'Wallet connection is unavailable. Set NEXT_PUBLIC_REOWN_PROJECT_ID.',
+    unavailable: 'Wallet connection is unavailable. Please try again later.',
     connectionError: 'Unable to open wallet connection. Please try again.',
     disconnectError: 'Unable to disconnect. Please try again.',
     spicy: 'Spicy',
