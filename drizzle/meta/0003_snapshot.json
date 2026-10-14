@@ -1,5 +1,5 @@
 {
-  "id": "86994b0b-c4b9-472f-9c55-915807a8dbc0",
+  "id": "73d081a1-2843-4850-b76f-e44851a162e9",
   "prevId": "e384c637-c9c2-4728-8a4e-0d5a24a7335f",
   "version": "7",
   "dialect": "postgresql",
@@ -295,7 +295,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "picks_address": {
+          "name": "picks_address",
+          "columns": [
+            {
+              "expression": "address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "picks_match_id_matches_id_fk": {
           "name": "picks_match_id_matches_id_fk",
@@ -379,7 +395,23 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "predict_nonces_address": {
+          "name": "predict_nonces_address",
+          "columns": [
+            {
+              "expression": "address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -410,7 +442,23 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "predict_rate_limits_expiry": {
+          "name": "predict_rate_limits_expiry",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -636,6 +684,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "prediction_points_address": {
+          "name": "prediction_points_address",
+          "columns": [
+            {
+              "expression": "address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -776,7 +839,23 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "siwe_nonces_address": {
+          "name": "siwe_nonces_address",
+          "columns": [
+            {
+              "expression": "address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

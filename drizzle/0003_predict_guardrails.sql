@@ -39,7 +39,12 @@ ALTER TABLE "admin_audit_log" DROP CONSTRAINT "admin_audit_log_actor_lowercase";
 ALTER TABLE "matches" DROP CONSTRAINT "matches_created_by_lowercase";--> statement-breakpoint
 ALTER TABLE "picks" ADD COLUMN "signature" text;--> statement-breakpoint
 ALTER TABLE "siwe_nonces" ADD COLUMN "address" text;--> statement-breakpoint
+CREATE INDEX "predict_nonces_address" ON "predict_nonces" USING btree ("address");--> statement-breakpoint
+CREATE INDEX "predict_rate_limits_expiry" ON "predict_rate_limits" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "prediction_audit_address_index" ON "prediction_audit" USING btree ("address");--> statement-breakpoint
+CREATE INDEX "picks_address" ON "picks" USING btree ("address");--> statement-breakpoint
+CREATE INDEX "prediction_points_address" ON "prediction_points" USING btree ("address");--> statement-breakpoint
+CREATE INDEX "siwe_nonces_address" ON "siwe_nonces" USING btree ("address");--> statement-breakpoint
 ALTER TABLE "admin_audit_log" ADD CONSTRAINT "admin_audit_log_actor_lowercase" CHECK ("admin_audit_log"."actor_address" ~ '^(0x[0-9a-f]{40}|erased:[0-9a-f]{64})$');--> statement-breakpoint
 ALTER TABLE "matches" ADD CONSTRAINT "matches_created_by_lowercase" CHECK ("matches"."created_by" ~ '^(0x[0-9a-f]{40}|erased:[0-9a-f]{64})$');
 --> statement-breakpoint

@@ -36,13 +36,17 @@ export const profiles = pgTable(
   ],
 )
 
-export const siweNonces = pgTable('siwe_nonces', {
-  nonce: text('nonce').primaryKey(),
-  address: text('address'),
-  createdAt: time('created_at').notNull().defaultNow(),
-  expiresAt: time('expires_at').notNull(),
-  usedAt: time('used_at'),
-})
+export const siweNonces = pgTable(
+  'siwe_nonces',
+  {
+    nonce: text('nonce').primaryKey(),
+    address: text('address'),
+    createdAt: time('created_at').notNull().defaultNow(),
+    expiresAt: time('expires_at').notNull(),
+    usedAt: time('used_at'),
+  },
+  (table) => [index('siwe_nonces_address').on(table.address)],
+)
 
 export const adminAuditLog = pgTable(
   'admin_audit_log',
@@ -134,6 +138,7 @@ export const picks = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.matchId, table.address] }),
+    index('picks_address').on(table.address),
     check(
       'picks_address_lowercase',
       sql`${table.address} ~ '^0x[0-9a-f]{40}$'`,
@@ -161,6 +166,7 @@ export const predictionPoints = pgTable(
       table.weekStartUtc,
       table.address,
     ),
+    index('prediction_points_address').on(table.address),
     check(
       'prediction_points_address_lowercase',
       sql`${table.address} ~ '^0x[0-9a-f]{40}$'`,
@@ -188,17 +194,25 @@ export const predictTermsAcceptances = pgTable(
   (table) => [primaryKey({ columns: [table.address, table.version] })],
 )
 
-export const predictNonces = pgTable('predict_nonces', {
-  nonce: text('nonce').primaryKey(),
-  address: text('address').notNull(),
-  expiresAt: time('expires_at').notNull(),
-})
+export const predictNonces = pgTable(
+  'predict_nonces',
+  {
+    nonce: text('nonce').primaryKey(),
+    address: text('address').notNull(),
+    expiresAt: time('expires_at').notNull(),
+  },
+  (table) => [index('predict_nonces_address').on(table.address)],
+)
 
-export const predictRateLimits = pgTable('predict_rate_limits', {
-  address: text('address').primaryKey(),
-  count: integer('count').notNull(),
-  expiresAt: time('expires_at').notNull(),
-})
+export const predictRateLimits = pgTable(
+  'predict_rate_limits',
+  {
+    address: text('address').primaryKey(),
+    count: integer('count').notNull(),
+    expiresAt: time('expires_at').notNull(),
+  },
+  (table) => [index('predict_rate_limits_expiry').on(table.expiresAt)],
+)
 
 export const predictionAudit = pgTable(
   'prediction_audit',

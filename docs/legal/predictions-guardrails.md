@@ -31,8 +31,13 @@ Existing contract experiments are not part of this Predict flow.
   `no-store`; failures use existing 400/401/403/429/500 response conventions.
   Repeated acceptance is idempotent and retains the first acceptance timestamp.
 - Rate-limit rows hold wallet, count and expiry, not IP. Expiry resets the
-  counter on the next request; there is no automatic row purge. They are erased
-  with the wallet. Deployment operations must confirm retention/purge policy.
+  counter on the next request. Each authenticated, same-origin, country-eligible
+  limiter call also deletes at most 100 other rows whose expiry is over an hour
+  old, oldest first, using the expiry index and skipping locked rows. Active and
+  recently expired limits are not removed. The current wallet is excluded from
+  cleanup and its expired counter is reset atomically. This opportunistic purge
+  needs request traffic; it is not a scheduled TTL or a fixed deletion deadline.
+  Erasure also deletes the wallet's row.
 
 ## Trusted country configuration
 
@@ -45,6 +50,8 @@ resolver and spoofing tests before enablement. Raw IP is neither stored nor logg
 Missing/non-ISO/`XX` countries fail closed in production; non-production may
 use an unknown result for local testing. Country is checked again for every
 pick, never just at terms acceptance.
+Preview deployments must also run with `NODE_ENV=production`; only local
+development/tests may use the unknown-country allowance.
 
 The default typed draft list is in `predict-config.ts`:
 
@@ -68,8 +75,10 @@ release. Do not infer legal eligibility from country checking alone.
 ## Erasure hand-off to SR-23
 
 `erasePredictData(address)` validates and normalises the address and requires an
-independently generated server-only `PREDICT_ERASURE_SECRET` of at least 32
-characters. Never commit its value. No database work occurs if it is missing.
+independently generated, restricted server-only `PREDICT_ERASURE_SECRET` of at
+least 32 characters. Store it in deployment secret management and restrict access
+to authorised erasure operators; never expose it in client bundles or logs.
+Never commit its value. No database work occurs if it is missing.
 HMAC-SHA-256 produces `erased:<digest>` without storing an address-to-digest
 mapping. This is pseudonymisation, not a claim of irreversible anonymisation:
 restrict secret access, retention and backups separately.

@@ -21,6 +21,7 @@ describe('static legal drafts', () => {
         'Last updated: 14 October 2026 · Version: 0.3',
       )
       const text = screen.getByRole('main').textContent
+      expect(text).not.toContain('[FREE_TO_PLAY_BANNER]')
       expect(text).not.toMatch(
         /SR-\d+|R-\d+|S-05|P-01|schema|DELETE \/api\/profile/,
       )
@@ -59,7 +60,7 @@ describe('static legal drafts', () => {
     render(<PrivacyPage />)
     const text = screen.getByRole('main').textContent
     for (const phrase of [
-      'An append-only audit log records picks and signatures',
+      'Audit-log entries are not edited, except that on erasure your address is pseudonymised and signatures are removed.',
       'Predict aggregates are anonymised after 24 months.',
       'The terms-acceptance record contains your wallet address, the terms version, the UTC time, the country code where available and the country-check result.',
       'We also record your 18+ confirmation and its UTC time, not your date of birth.',
@@ -121,7 +122,7 @@ describe('static legal drafts', () => {
       'You must be 18 or over to use ScoutReport.',
     )
     expect(screen.getByRole('main')).toHaveTextContent(
-      'When you accept the terms, we record your wallet address, the terms version, the UTC time and the country-check result.',
+      'When you accept the terms, we record your wallet address, the terms version, the UTC time, the country code where available and the country-check result.',
     )
     expect(screen.getByRole('main')).toHaveTextContent(
       'The IP country check is done on our server; raw IP is not stored.',

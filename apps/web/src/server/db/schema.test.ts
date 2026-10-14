@@ -5,6 +5,8 @@ import {
   adminAuditLog,
   matches,
   picks,
+  predictNonces,
+  predictRateLimits,
   predictionPoints,
   profiles,
   siweNonces,
@@ -32,11 +34,38 @@ describe('SR-44 off-chain schema', () => {
         columns: ['season_id', 'week_start_utc', 'address'],
         unique: false,
       },
+      {
+        name: 'prediction_points_address',
+        columns: ['address'],
+        unique: false,
+      },
     ])
     expect(config.primaryKeys[0].columns.map((column) => column.name)).toEqual([
       'match_id',
       'address',
     ])
+  })
+
+  it.each([picks, predictionPoints, siweNonces, predictNonces])(
+    'indexes wallet-only erasure for table %s',
+    (table) => {
+      expect(getTableConfig(table).indexes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            config: expect.objectContaining({
+              method: 'btree',
+              columns: [expect.objectContaining({ name: 'address' })],
+            }),
+          }),
+        ]),
+      )
+    },
+  )
+
+  it('indexes expiry for bounded rate-limit cleanup', () => {
+    expect(getTableConfig(predictRateLimits).indexes[0].config.columns).toEqual(
+      [expect.objectContaining({ name: 'expires_at' })],
+    )
   })
 
   it('contains the off-chain match, pick and score tables', () => {

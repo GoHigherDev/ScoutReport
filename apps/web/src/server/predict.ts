@@ -180,6 +180,16 @@ const predictAcceptanceLimiter: RateLimiter = {
       count: number
       retry_after: number
     }>(sql`
+      WITH expired AS (
+        SELECT address FROM predict_rate_limits
+        WHERE expires_at < now() - interval '1 hour' AND address <> ${address}
+        ORDER BY expires_at
+        LIMIT 100
+        FOR UPDATE SKIP LOCKED
+      ), cleanup AS (
+        DELETE FROM predict_rate_limits
+        WHERE address IN (SELECT address FROM expired)
+      )
       INSERT INTO predict_rate_limits (address, count, expires_at)
       VALUES (${address}, 1, clock_timestamp() + interval '1 minute')
       ON CONFLICT (address) DO UPDATE SET

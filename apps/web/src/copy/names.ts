@@ -33,7 +33,7 @@ export const NAMES = {
       },
       {
         heading: 'Off-chain Predict',
-        text: 'Picks are free and wallet-signed using EIP-712: a wallet signature is required, with no gas and no on-chain transaction. Postgres stores the wallet address, pick, signature and timestamps to verify the submission, enforce pick deadlines and calculate non-transferable prediction points. An append-only audit log records picks and signatures for accountability, with an exception for erasure. [LAWFUL BASIS FOR PREDICT — TO BE CONFIRMED]. On erasure, we delete your picks, prediction points, terms-acceptance and 18+ records, wallet-linked nonces and stored signatures, and pseudonymise your audit-log entries, which are kept. Contact the privacy contact to request erasure.',
+        text: 'Picks are free and wallet-signed using EIP-712: a wallet signature is required, with no gas and no on-chain transaction. Postgres stores the wallet address, pick, signature and timestamps to verify the submission, enforce pick deadlines and calculate non-transferable prediction points. Audit-log entries are not edited, except that on erasure your address is pseudonymised and signatures are removed. [LAWFUL BASIS FOR PREDICT — TO BE CONFIRMED]. On erasure, we delete your picks, prediction points, terms-acceptance and 18+ records, wallet-linked nonces and stored signatures, and pseudonymise your audit-log entries, which are kept. Contact the privacy contact to request erasure.',
       },
       {
         heading: 'Retention',
@@ -85,7 +85,7 @@ export const NAMES = {
       },
       {
         heading: 'Draft scope',
-        text: 'These terms are a draft pending legal review. [SERVICE TERMS, ELIGIBILITY AND GOVERNING LAW — TO BE CONFIRMED]. A wallet signature is required to sign in; signing in costs no gas and does not move funds. Predict picks are free, off-chain and wallet-signed with no gas. When you accept the terms, we record your wallet address, the terms version, the UTC time and the country-check result. The IP country check is done on our server; raw IP is not stored. Contact the privacy contact with questions about the terms or your records.',
+        text: 'These terms are a draft pending legal review. [SERVICE TERMS, ELIGIBILITY AND GOVERNING LAW — TO BE CONFIRMED]. A wallet signature is required to sign in; signing in costs no gas and does not move funds. Predict picks are free, off-chain and wallet-signed with no gas. When you accept the terms, we record your wallet address, the terms version, the UTC time, the country code where available and the country-check result. The IP country check is done on our server; raw IP is not stored. Contact the privacy contact with questions about the terms or your records.',
       },
       {
         heading: '18+ eligibility',

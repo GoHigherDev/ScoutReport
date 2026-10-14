@@ -37,6 +37,47 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     vi.unstubAllEnvs()
   })
 
+  async function authenticatedRequest(address: string) {
+    const response = new Response()
+    const session = await readSession(new Request(origin), response)
+    Object.assign(session, {
+      address,
+      chainId: 88882,
+      isContract: false,
+      issuedAt: Date.now(),
+    })
+    await session.save()
+    const cookie = response.headers.get('Set-Cookie')!.split(';')[0]
+    return (body: unknown) =>
+      new Request(`${origin}/api/predict/age-confirmation`, {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+          Origin: origin,
+          'x-vercel-ip-country': 'ES',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+  }
+
+  it('creates btree address indexes for wallet-only erasure and an expiry index for cleanup', async () => {
+    const indexes = await client`
+      SELECT tablename, indexname, indexdef FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND indexname IN (
+          'picks_address', 'prediction_points_address', 'siwe_nonces_address',
+          'predict_nonces_address', 'predict_rate_limits_expiry'
+        )
+    `
+    expect(indexes).toHaveLength(5)
+    for (const row of indexes) {
+      expect(row.indexdef).toContain(
+        `USING btree (${row.tablename === 'predict_rate_limits' ? 'expires_at' : 'address'})`,
+      )
+    }
+  })
+
   async function fixture() {
     const account = privateKeyToAccount(generatePrivateKey())
     const address = account.address.toLowerCase()
@@ -209,27 +250,7 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
   it('authenticates a real encrypted session and enforces a shared database rate limit', async () => {
     const address =
       privateKeyToAccount(generatePrivateKey()).address.toLowerCase()
-    const response = new Response()
-    const session = await readSession(new Request(origin), response)
-    Object.assign(session, {
-      address,
-      chainId: 88882,
-      isContract: false,
-      issuedAt: Date.now(),
-    })
-    await session.save()
-    const cookie = response.headers.get('Set-Cookie')!.split(';')[0]
-    const request = (body: unknown) =>
-      new Request(`${origin}/api/predict/age-confirmation`, {
-        method: 'POST',
-        headers: {
-          Cookie: cookie,
-          Origin: origin,
-          'x-vercel-ip-country': 'ES',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      })
+    const request = await authenticatedRequest(address)
     const routes = createPredictAcceptanceRoutes()
     expect((await routes.confirmAge(request({ confirmed: true }))).status).toBe(
       200,
@@ -258,5 +279,62 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
       200,
     )
     await erasePredictData(address)
+  })
+
+  it('cleans at most 100 old limits per eligible request, skips locks and preserves active/recent limits', async () => {
+    const address =
+      privateKeyToAccount(generatePrivateKey()).address.toLowerCase()
+    const expired = Array.from(
+      { length: 105 },
+      () => `0x${randomBytes(20).toString('hex')}`,
+    )
+    const recent = `0x${randomBytes(20).toString('hex')}`
+    const active = `0x${randomBytes(20).toString('hex')}`
+    await client`
+      INSERT INTO predict_rate_limits (address, count, expires_at)
+      SELECT unnest(${expired}::text[]), 20, now() - interval '2 hours'
+    `
+    await client`
+      INSERT INTO predict_rate_limits (address, count, expires_at) VALUES
+        (${address}, 99, now() - interval '2 hours'),
+        (${recent}, 20, now() - interval '30 minutes'),
+        (${active}, 20, now() + interval '1 minute')
+    `
+    const preserved = await client`
+      SELECT * FROM predict_rate_limits WHERE address IN (${recent}, ${active}) ORDER BY address
+    `
+    const request = await authenticatedRequest(address)
+    const routes = createPredictAcceptanceRoutes()
+    try {
+      await client.begin(async (locker) => {
+        await locker`SELECT address FROM predict_rate_limits WHERE address = ${expired[0]} FOR UPDATE`
+        expect(
+          (await routes.confirmAge(request({ confirmed: true }))).status,
+        ).toBe(200)
+        const remaining = await locker`
+          SELECT address FROM predict_rate_limits WHERE address = ANY(${expired}::text[])
+        `
+        expect(remaining).toHaveLength(5)
+        expect(remaining.map((row) => row.address)).toContain(expired[0])
+      })
+      const [current] =
+        await client`SELECT count FROM predict_rate_limits WHERE address = ${address}`
+      expect(current.count).toBe(1)
+      expect(
+        (await routes.acceptTerms(request({ version: PREDICT_TERMS_VERSION })))
+          .status,
+      ).toBe(200)
+      expect(
+        await client`SELECT address FROM predict_rate_limits WHERE address = ANY(${expired}::text[])`,
+      ).toHaveLength(0)
+      expect(
+        await client`
+        SELECT * FROM predict_rate_limits WHERE address IN (${recent}, ${active}) ORDER BY address
+      `,
+      ).toEqual(preserved)
+    } finally {
+      await client`DELETE FROM predict_rate_limits WHERE address = ANY(${[...expired, recent, active]}::text[])`
+      await erasePredictData(address)
+    }
   })
 })
