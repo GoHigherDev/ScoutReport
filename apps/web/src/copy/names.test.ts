@@ -52,3 +52,10 @@ it('keeps every RP panel copy string, including templates and all caveats, clean
     expect(text).not.toMatch(bannedCopy)
   }
 })
+
+it('keeps all gas and transaction copy neutral', () => {
+  const { errors, ...copy } = NAMES.gas
+  for (const text of [...Object.values(copy), ...Object.values(errors)]) {
+    expect(text).not.toMatch(bannedCopy)
+  }
+})

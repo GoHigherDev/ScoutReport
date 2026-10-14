@@ -8,6 +8,50 @@ export const NAMES = {
     sessionRequired: 'A session is required',
     unexpectedError: 'An unexpected error occurred',
   },
+  gas: {
+    idle: 'Submit transaction',
+    checking: 'Checking CHZ gas…',
+    awaiting_signature: 'Awaiting your wallet signature…',
+    pending: 'Transaction pending…',
+    confirmed: 'Transaction confirmed',
+    failed: 'Transaction not confirmed',
+    explorer: 'View transaction in explorer',
+    insufficient_gas:
+      'There is not enough CHZ to cover this transaction and its gas fee.',
+    wrong_network:
+      'Switch your wallet to the app network before submitting a transaction.',
+    unknown: 'The transaction could not be completed.',
+    panelHeading: 'CHZ for gas',
+    spicyExplanation:
+      'Spicy transactions need test CHZ for gas. You can request test CHZ from a faucet.',
+    mainnetExplanation:
+      'A small amount of CHZ is needed to pay gas fees on Chiliz Mainnet.',
+    spicyFaucet: 'Spicy Faucet',
+    tatumFaucet: 'Tatum Chiliz testnet faucet',
+    signIn: 'Sign in',
+    signingIn: 'Awaiting sign-in signature…',
+    signedIn: 'Signed in',
+    errors: {
+      ZeroAdmin: 'An administrator address is required.',
+      MatchAlreadyExists: 'This match already exists.',
+      UnknownMatch: 'This match could not be found.',
+      InvalidLockTime: 'The lock time must be in the future.',
+      InvalidOutcomeCount: 'A match must have two or three outcomes.',
+      InvalidPointsForCorrect: 'The match points setting is not valid.',
+      InvalidOutcome: 'Choose one of the available outcomes.',
+      MatchNotOpen: 'This match is not open.',
+      MatchLocked:
+        'This match is locked. Predictions can no longer be changed.',
+      MatchNotLocked: 'This match cannot be settled before its lock time.',
+      MatchNotSettled: 'This match has not been settled.',
+      UnexpectedCall: 'This action is not supported by the contract.',
+      AccessControlUnauthorizedAccount:
+        'This wallet does not have permission for this action.',
+      AccessControlBadConfirmation: 'The account confirmation does not match.',
+      EnforcedPause: 'Contract transactions are paused.',
+      ExpectedPause: 'The contract is not paused.',
+    },
+  },
   xHandle: '@xScoutReport',
   scoreLabel: 'Scout Rating',
   tiers: {
@@ -149,6 +193,11 @@ export const NAMES = {
   disclaimer:
     'ScoutReport is an independent project and is not affiliated with Socios.com or Chiliz.',
 } as const
+
+export const SPICY_FAUCETS = [
+  { label: NAMES.gas.spicyFaucet, href: 'https://spicy-faucet.chiliz.com/' },
+  { label: NAMES.gas.tatumFaucet, href: 'https://tatum.io/faucets/chiliz' },
+] as const
 
 export const OPTIMISER_SOURCE_LINKS = [
   {

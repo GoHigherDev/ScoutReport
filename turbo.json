@@ -1,7 +1,10 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "agentGuidance": false,
-  "globalDependencies": ["packages/contracts/deployments/*.json"],
+  "globalDependencies": [
+    "packages/contracts/deployments/*.json",
+    "packages/contracts/abis/*.json"
+  ],
   "globalEnv": [
     "DATABASE_URL",
     "ADMIN_ADDRESSES",
