@@ -1,5 +1,5 @@
 {
-  "id": "549dbcaa-4e6f-4d0e-85e9-784c1791fcf9",
+  "id": "e384c637-c9c2-4728-8a4e-0d5a24a7335f",
   "prevId": "a4d8552a-d75c-4ad9-9f4f-726c69b7ff77",
   "version": "7",
   "dialect": "postgresql",
@@ -295,8 +295,12 @@
           "name": "picks_match_id_matches_id_fk",
           "tableFrom": "picks",
           "tableTo": "matches",
-          "columnsFrom": ["match_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "match_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -304,7 +308,10 @@
       "compositePrimaryKeys": {
         "picks_match_id_address_pk": {
           "name": "picks_match_id_address_pk",
-          "columns": ["match_id", "address"]
+          "columns": [
+            "match_id",
+            "address"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -359,14 +366,67 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "prediction_points_season_address": {
+          "name": "prediction_points_season_address",
+          "columns": [
+            {
+              "expression": "season_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "prediction_points_season_week_address": {
+          "name": "prediction_points_season_week_address",
+          "columns": [
+            {
+              "expression": "season_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "week_start_utc",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "prediction_points_match_id_matches_id_fk": {
           "name": "prediction_points_match_id_matches_id_fk",
           "tableFrom": "prediction_points",
           "tableTo": "matches",
-          "columnsFrom": ["match_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "match_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -374,7 +434,10 @@
       "compositePrimaryKeys": {
         "prediction_points_match_id_address_pk": {
           "name": "prediction_points_match_id_address_pk",
-          "columns": ["match_id", "address"]
+          "columns": [
+            "match_id",
+            "address"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -441,7 +504,9 @@
         "profiles_username_unique": {
           "name": "profiles_username_unique",
           "nullsNotDistinct": false,
-          "columns": ["username"]
+          "columns": [
+            "username"
+          ]
         }
       },
       "policies": {},

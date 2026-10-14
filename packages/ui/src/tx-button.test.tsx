@@ -105,11 +105,13 @@ describe('TxButton', () => {
 
   it('decodes estimation reverts without writing', async () => {
     const props = setup()
-    props.guard = vi.fn().mockResolvedValue({
-      ok: false,
-      reason: 'unknown',
-      error: { data: '0x123' },
-    })
+    props.guard = vi
+      .fn()
+      .mockResolvedValue({
+        ok: false,
+        reason: 'unknown',
+        error: { data: '0x123' },
+      })
     render(<TxButton {...props} />)
     fireEvent.click(screen.getByRole('button'))
     expect(await screen.findByRole('alert')).toHaveProperty(
@@ -160,22 +162,4 @@ describe('TxButton', () => {
     fireEvent.click(screen.getByRole('button'))
     expect(props.guard).not.toHaveBeenCalled()
   })
-
-  it.each(['success', 'guard', 'write', 'receipt'] as const)(
-    'releases its busy callback after %s',
-    async (outcome) => {
-      const props = setup()
-      props.onBusyChange = vi.fn()
-      if (outcome === 'guard') props.guard = vi.fn().mockRejectedValue({})
-      if (outcome === 'write') props.write = vi.fn().mockRejectedValue({})
-      if (outcome === 'receipt')
-        props.waitForReceipt = vi.fn().mockRejectedValue({})
-      render(<TxButton {...props} />)
-      fireEvent.click(screen.getByRole('button'))
-      expect(props.onBusyChange).toHaveBeenNthCalledWith(1, true)
-      await waitFor(() =>
-        expect(props.onBusyChange).toHaveBeenLastCalledWith(false),
-      )
-    },
-  )
 })

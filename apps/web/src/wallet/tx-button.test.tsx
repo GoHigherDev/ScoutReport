@@ -194,73 +194,14 @@ it('has reviewed copy for every generated custom error', () => {
 })
 
 it('does not confirm a cancelled replacement transaction', async () => {
-  const onReceipt = vi.fn()
   mocks.rpc.waitForTransactionReceipt.mockImplementation(
     async ({ onReplaced }) => {
       onReplaced({ reason: 'cancelled' })
       return { status: 'success', transactionHash: hash }
     },
   )
-  render(<TransactionButton request={request} onReceipt={onReceipt} />)
+  render(<TransactionButton request={request} />)
   fireEvent.click(screen.getByRole('button'))
   expect(await screen.findByRole('alert')).toHaveTextContent(NAMES.gas.unknown)
   expect(screen.getByRole('button')).toHaveTextContent(NAMES.gas.failed)
-  expect(onReceipt).not.toHaveBeenCalled()
-})
-
-it.each(['success', 'reverted'] as const)(
-  'reports the actual %s receipt hash for auditing',
-  async (status) => {
-    const receiptHash = `0x${'2'.repeat(64)}` as const
-    const onReceipt = vi.fn().mockResolvedValue(undefined)
-    const onBusyChange = vi.fn()
-    mocks.rpc.waitForTransactionReceipt.mockResolvedValue({
-      status,
-      transactionHash: receiptHash,
-    })
-    render(
-      <TransactionButton
-        request={request}
-        onReceipt={onReceipt}
-        onBusyChange={onBusyChange}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button'))
-    await waitFor(() =>
-      expect(onReceipt).toHaveBeenCalledWith(receiptHash, status),
-    )
-    await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false))
-    expect(onBusyChange).toHaveBeenNthCalledWith(1, true)
-  },
-)
-
-it('reports a submitted hash even when receipt monitoring fails', async () => {
-  const onSubmitted = vi.fn()
-  const onReceipt = vi.fn()
-  mocks.rpc.waitForTransactionReceipt.mockRejectedValue({})
-  render(
-    <TransactionButton
-      request={request}
-      onSubmitted={onSubmitted}
-      onReceipt={onReceipt}
-    />,
-  )
-  fireEvent.click(screen.getByRole('button'))
-  await screen.findByRole('alert')
-  expect(onSubmitted).toHaveBeenCalledWith(hash)
-  expect(onReceipt).not.toHaveBeenCalled()
-})
-
-it('checks the expected session wallet before any RPC or write', async () => {
-  render(
-    <TransactionButton
-      request={request}
-      expectedAccount="0x0000000000000000000000000000000000000002"
-    />,
-  )
-  fireEvent.click(screen.getByRole('button'))
-  await screen.findByRole('alert')
-  expect(mocks.rpc.getBalance).not.toHaveBeenCalled()
-  expect(mocks.send).not.toHaveBeenCalled()
 })

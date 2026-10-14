@@ -54,7 +54,9 @@ CREATE TABLE "prediction_points" (
 --> statement-breakpoint
 ALTER TABLE "picks" ADD CONSTRAINT "picks_match_id_matches_id_fk" FOREIGN KEY ("match_id") REFERENCES "public"."matches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "prediction_points" ADD CONSTRAINT "prediction_points_match_id_matches_id_fk" FOREIGN KEY ("match_id") REFERENCES "public"."matches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "matches_id_created" ON "matches" USING btree ("created_at","id");
+CREATE UNIQUE INDEX "matches_id_created" ON "matches" USING btree ("created_at","id");--> statement-breakpoint
+CREATE INDEX "prediction_points_season_address" ON "prediction_points" USING btree ("season_id","address");--> statement-breakpoint
+CREATE INDEX "prediction_points_season_week_address" ON "prediction_points" USING btree ("season_id","week_start_utc","address");
 --> statement-breakpoint
 CREATE FUNCTION reject_admin_audit_log_mutation() RETURNS trigger
 LANGUAGE plpgsql

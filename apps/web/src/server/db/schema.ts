@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   customType,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -152,6 +153,12 @@ export const predictionPoints = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.matchId, table.address] }),
+    index('prediction_points_season_address').on(table.seasonId, table.address),
+    index('prediction_points_season_week_address').on(
+      table.seasonId,
+      table.weekStartUtc,
+      table.address,
+    ),
     check(
       'prediction_points_address_lowercase',
       sql`${table.address} ~ '^0x[0-9a-f]{40}$'`,

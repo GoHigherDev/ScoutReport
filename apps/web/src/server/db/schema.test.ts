@@ -11,6 +11,34 @@ import {
 } from './schema'
 
 describe('SR-44 off-chain schema', () => {
+  it('indexes season and London-week totals without changing score uniqueness', () => {
+    const config = getTableConfig(predictionPoints)
+    expect(
+      config.indexes.map(({ config }) => ({
+        name: config.name,
+        columns: config.columns.map((column) =>
+          'name' in column ? column.name : undefined,
+        ),
+        unique: config.unique,
+      })),
+    ).toEqual([
+      {
+        name: 'prediction_points_season_address',
+        columns: ['season_id', 'address'],
+        unique: false,
+      },
+      {
+        name: 'prediction_points_season_week_address',
+        columns: ['season_id', 'week_start_utc', 'address'],
+        unique: false,
+      },
+    ])
+    expect(config.primaryKeys[0].columns.map((column) => column.name)).toEqual([
+      'match_id',
+      'address',
+    ])
+  })
+
   it('contains the off-chain match, pick and score tables', () => {
     expect(
       [
