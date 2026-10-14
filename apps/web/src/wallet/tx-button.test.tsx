@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { encodeErrorResult } from 'viem'
+import { ConnectorChainMismatchError } from '@wagmi/core'
 import { SCOUTREPORT_ABIS } from '@scoutreport/chain'
 import { NAMES } from '../copy/names'
 import { TransactionButton } from './tx-button'
@@ -24,7 +25,8 @@ const mocks = vi.hoisted(() => ({
   },
 }))
 vi.mock('wagmi', () => ({ useConfig: () => mocks.config }))
-vi.mock('@wagmi/core', () => ({
+vi.mock('@wagmi/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@wagmi/core')>()),
   getAccount: mocks.account,
   getWalletClient: mocks.wallet,
 }))
@@ -155,6 +157,29 @@ it('decodes estimation reverts into approved copy', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent(
     NAMES.gas.errors.MatchLocked,
   )
+  expect(mocks.send).not.toHaveBeenCalled()
+})
+
+it('shows wrong-network guidance when wallet preparation rejects a chain mismatch', async () => {
+  mocks.wallet.mockRejectedValue(
+    new ConnectorChainMismatchError({
+      connectionChainId: 88882,
+      connectorChainId: 1,
+    }),
+  )
+  render(<TransactionButton request={request} />)
+  fireEvent.click(screen.getByRole('button'))
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    NAMES.gas.wrong_network,
+  )
+  expect(mocks.send).not.toHaveBeenCalled()
+})
+
+it('keeps other wallet preparation failures generic', async () => {
+  mocks.wallet.mockRejectedValue(new Error('Private provider details'))
+  render(<TransactionButton request={request} />)
+  fireEvent.click(screen.getByRole('button'))
+  expect(await screen.findByRole('alert')).toHaveTextContent(NAMES.gas.unknown)
   expect(mocks.send).not.toHaveBeenCalled()
 })
 

@@ -2,7 +2,11 @@
 
 import { useRef } from 'react'
 import { useConfig } from 'wagmi'
-import { getAccount, getWalletClient } from '@wagmi/core'
+import {
+  ConnectorChainMismatchError,
+  getAccount,
+  getWalletClient,
+} from '@wagmi/core'
 import type { Address, Hash } from 'viem'
 import {
   decodeTxError,
@@ -76,7 +80,8 @@ export function TransactionButton({
       }}
       explorerUrl={(hash) => explorerTxUrl(chain.id, hash)}
       decodeError={(error) =>
-        error instanceof WrongNetworkError
+        error instanceof WrongNetworkError ||
+        error instanceof ConnectorChainMismatchError
           ? NAMES.gas.wrong_network
           : decodeTxError(error, NAMES.gas.errors, NAMES.gas.unknown)
       }
