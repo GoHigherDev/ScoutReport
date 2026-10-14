@@ -45,9 +45,15 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
 
 export function AdminMatches({ actorAddress }: { actorAddress: string }) {
   const address = getPredictionsAddress()
+  const [matchIdInput, setMatchIdInput] = useState('')
+  const [lookupId, setLookupId] = useState('')
+  const [lookupError, setLookupError] = useState(false)
   const list = useQuery({
-    queryKey: ['admin-matches', actorAddress],
-    queryFn: () => api<{ matches: AdminMatch[] }>('/api/admin/matches'),
+    queryKey: ['admin-matches', actorAddress, lookupId],
+    queryFn: () =>
+      api<{ matches: AdminMatch[] }>(
+        `/api/admin/matches${lookupId ? `?matchId=${encodeURIComponent(lookupId)}` : ''}`,
+      ),
     retry: false,
     refetchOnWindowFocus: false,
   })
@@ -55,6 +61,42 @@ export function AdminMatches({ actorAddress }: { actorAddress: string }) {
     <div className="space-y-6">
       {!address && <p role="status">{NAMES.admin.unavailable}</p>}
       <NewMatch onSaved={() => list.refetch()} />
+      <form
+        className="space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault()
+          const valid = /^0x[0-9a-fA-F]{64}$/.test(matchIdInput)
+          setLookupError(!valid)
+          if (valid) setLookupId(matchIdInput.toLowerCase())
+        }}
+      >
+        <label className="block">
+          {NAMES.admin.findMatch}
+          <input
+            className={fieldClass}
+            value={matchIdInput}
+            onChange={(event) => setMatchIdInput(event.target.value.trim())}
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" disabled={list.isFetching}>
+            {NAMES.admin.find}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={list.isFetching}
+            onClick={() => {
+              setLookupId('')
+              setMatchIdInput('')
+              setLookupError(false)
+            }}
+          >
+            {NAMES.admin.latest}
+          </Button>
+        </div>
+        {lookupError && <p role="alert">{NAMES.admin.invalidMatchId}</p>}
+      </form>
       <Button
         variant="secondary"
         disabled={list.isFetching}
@@ -64,7 +106,9 @@ export function AdminMatches({ actorAddress }: { actorAddress: string }) {
       </Button>
       {list.isPending && <p role="status">{NAMES.admin.loading}</p>}
       {list.isError && <p role="alert">{NAMES.admin.error}</p>}
-      {list.data?.matches.length === 0 && <p>{NAMES.admin.empty}</p>}
+      {list.data?.matches.length === 0 && (
+        <p>{lookupId ? NAMES.admin.notFound : NAMES.admin.empty}</p>
+      )}
       {list.data?.matches.map((match) => (
         <MatchCard
           key={match.id}
@@ -307,11 +351,19 @@ function MatchCard({
     if (action) dialog.current?.showModal()
   }, [action])
 
-  async function record(audit: Audit, reverted = receiptFailure) {
+  async function record(audit: Audit) {
     setRecording(true)
     setAuditError(false)
     try {
-      await api('/api/admin/matches/audit', audit)
+      const response = await api<{
+        ok: true
+        receiptStatus: 'success' | 'reverted'
+      }>('/api/admin/matches/audit', audit)
+      if (!['success', 'reverted'].includes(response.receiptStatus)) {
+        throw new Error(NAMES.admin.auditError)
+      }
+      const reverted = response.receiptStatus === 'reverted'
+      setReceiptFailure(reverted)
       setPendingAudit(undefined)
       setAction(undefined)
       dialog.current?.close()
@@ -545,7 +597,7 @@ function MatchCard({
               setReceiptFailure(status === 'reverted')
               const audit = { matchId: match.matchId, action, txHash }
               setPendingAudit(audit)
-              await record(audit, status === 'reverted')
+              await record(audit)
             }}
           />
         )}

@@ -9,6 +9,11 @@ export const NAMES = {
     forbidden: 'This session does not have admin access.',
     refresh: 'Refresh matches',
     reopen: 'Open the console after signing in',
+    findMatch: 'Match ID',
+    find: 'Find match',
+    latest: 'Latest 100 matches',
+    invalidMatchId: 'Enter a valid bytes32 match ID.',
+    notFound: 'No match found for this ID.',
     unavailable:
       'On-chain match actions and settlement are unavailable until an approved Spicy deployment is recorded.',
     walletMismatch: 'Connect the wallet used for this admin session.',

@@ -50,6 +50,9 @@ fixture import, sports API, HLTV scraping or server-held settler key.
    match, and sign through the shared transaction button. The lock time must
    still be in the future. Check `MatchCreated` against the metadata before
    accepting predictions. Failed RPC reads are not treated as missing matches.
+   The default list shows the latest 100 metadata rows. Use the exact bytes32
+   match-ID lookup to manage older rows, including unfinished crediting and
+   audit recovery.
 
 ## Verify result → settle → credit
 

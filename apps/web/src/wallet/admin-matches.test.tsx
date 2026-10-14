@@ -78,7 +78,9 @@ beforeEach(() => {
   mocks.read.mockResolvedValue(open)
   mocks.fetch.mockImplementation(async (_path, options) =>
     Response.json(
-      options?.method === 'POST' ? { ok: true } : { matches: [match] },
+      options?.method === 'POST'
+        ? { ok: true, receiptStatus: mocks.receiptStatus }
+        : { matches: [match] },
     ),
   )
   vi.stubGlobal('fetch', mocks.fetch)
@@ -92,6 +94,67 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+})
+
+it('finds older matches by exact ID without depending on the latest list', async () => {
+  const olderId = `0x${'3'.repeat(64)}`
+  mocks.fetch.mockImplementation(async (path) =>
+    Response.json({
+      matches: path.includes('?matchId=')
+        ? [
+            {
+              ...match,
+              matchId: olderId,
+              sides: [
+                { name: 'Older first club', tokenKey: null },
+                { name: 'Older second club', tokenKey: null },
+              ],
+            },
+          ]
+        : [match],
+    }),
+  )
+  setup()
+  await screen.findByRole('heading', { name: 'First club / Second club' })
+  fireEvent.change(screen.getByLabelText(NAMES.admin.findMatch), {
+    target: { value: olderId },
+  })
+  fireEvent.submit(
+    screen.getByRole('button', { name: NAMES.admin.find }).closest('form')!,
+  )
+  await screen.findByRole('heading', {
+    name: 'Older first club / Older second club',
+  })
+  expect(mocks.fetch).toHaveBeenCalledWith(
+    `/api/admin/matches?matchId=${olderId}`,
+    expect.any(Object),
+  )
+  fireEvent.click(screen.getByRole('button', { name: NAMES.admin.latest }))
+  await screen.findByRole('heading', { name: 'First club / Second club' })
+})
+
+it('rejects a malformed lookup locally and distinguishes a missing match', async () => {
+  setup()
+  await screen.findByRole('heading', { name: 'First club / Second club' })
+  const calls = mocks.fetch.mock.calls.length
+  fireEvent.change(screen.getByLabelText(NAMES.admin.findMatch), {
+    target: { value: 'invalid' },
+  })
+  fireEvent.submit(
+    screen.getByRole('button', { name: NAMES.admin.find }).closest('form')!,
+  )
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    NAMES.admin.invalidMatchId,
+  )
+  expect(mocks.fetch).toHaveBeenCalledTimes(calls)
+  mocks.fetch.mockResolvedValue(Response.json({ matches: [] }))
+  fireEvent.change(screen.getByLabelText(NAMES.admin.findMatch), {
+    target: { value: `0x${'3'.repeat(64)}` },
+  })
+  fireEvent.submit(
+    screen.getByRole('button', { name: NAMES.admin.find }).closest('form')!,
+  )
+  await screen.findByText(NAMES.admin.notFound)
 })
 
 function setup() {
@@ -187,7 +250,7 @@ it('shows the match and winning result before settlement, then offers sequential
         result: 2,
         creditedCursor: audit.action === 'creditPoints' ? 50 : 0,
       })
-      return Response.json({ ok: true })
+      return Response.json({ ok: true, receiptStatus: 'success' })
     }
     return Response.json({ matches: [pastMatch] })
   })
@@ -327,7 +390,9 @@ it('retains a failed audit hash for retry and prevents another write', async () 
     within(dialog).getByRole('button', { name: NAMES.admin.cancel }),
   )
   expect(screen.getByRole('button', { name: NAMES.admin.void })).toBeDisabled()
-  mocks.fetch.mockResolvedValue(Response.json({ ok: true }))
+  mocks.fetch.mockResolvedValue(
+    Response.json({ ok: true, receiptStatus: 'success' }),
+  )
   fireEvent.click(screen.getByRole('button', { name: NAMES.admin.retryAudit }))
   await waitFor(() =>
     expect(screen.queryByText(NAMES.admin.auditError)).not.toBeInTheDocument(),
@@ -383,4 +448,70 @@ it('audits a reverted credit attempt but keeps failure visible and does not star
       }),
     }),
   )
+})
+
+it('uses the verified receipt status when recovering a historical reverted transaction', async () => {
+  mocks.receiptStatus = 'reverted'
+  mocks.read.mockResolvedValue({
+    ...open,
+    status: 2,
+    creditedCursor: 50,
+  })
+  setup()
+  await screen.findByText(`${NAMES.admin.progress}: 50 / 120`)
+  fireEvent.click(
+    screen.getByText(NAMES.admin.recoverAudit, { selector: 'summary' }),
+  )
+  fireEvent.change(screen.getByLabelText(NAMES.admin.action), {
+    target: { value: 'creditPoints' },
+  })
+  fireEvent.change(screen.getByLabelText(NAMES.admin.recoveryHash), {
+    target: { value: hash },
+  })
+  fireEvent.click(
+    screen.getByRole('button', { name: NAMES.admin.recoverAudit }),
+  )
+  await screen.findByRole('alert')
+  expect(screen.getByRole('alert')).toHaveTextContent(NAMES.gas.failed)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+it('clears an earlier reverted alert when a recovered transaction was successful', async () => {
+  mocks.receiptStatus = 'reverted'
+  mocks.read.mockResolvedValue({
+    ...open,
+    status: 2,
+    creditedCursor: 50,
+  })
+  setup()
+  await screen.findByText(`${NAMES.admin.progress}: 50 / 120`)
+  fireEvent.click(screen.getByRole('button', { name: NAMES.admin.credit }))
+  fireEvent.click(
+    within(await screen.findByRole('dialog')).getByRole('button', {
+      name: NAMES.admin.credit,
+    }),
+  )
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  )
+  expect(screen.getByRole('alert')).toHaveTextContent(NAMES.gas.failed)
+  mocks.receiptStatus = 'success'
+  fireEvent.click(
+    screen.getByText(NAMES.admin.recoverAudit, { selector: 'summary' }),
+  )
+  fireEvent.change(screen.getByLabelText(NAMES.admin.action), {
+    target: { value: 'creditPoints' },
+  })
+  fireEvent.change(screen.getByLabelText(NAMES.admin.recoveryHash), {
+    target: { value: `0x${'2'.repeat(64)}` },
+  })
+  fireEvent.click(
+    screen.getByRole('button', { name: NAMES.admin.recoverAudit }),
+  )
+  await waitFor(() =>
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument(),
+  )
+  expect(
+    within(await screen.findByRole('dialog')).getByText(NAMES.admin.creditHelp),
+  ).toBeInTheDocument()
 })

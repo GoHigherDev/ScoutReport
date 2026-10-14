@@ -297,6 +297,13 @@ export function createMatchRoutes(dependencies: Dependencies = {}) {
   return {
     GET: handler(options, async (_, request) => {
       await authenticate(request)
+      const requestedId = new URL(request.url).searchParams.get('matchId')
+      if (requestedId !== null) {
+        const parsed = hashSchema.safeParse(requestedId)
+        if (!parsed.success) invalid()
+        const match = await store.find(parsed.data)
+        return { matches: match ? [match] : [] }
+      }
       return { matches: await store.list() }
     }),
     POST: handler(
@@ -354,7 +361,7 @@ export function createMatchRoutes(dependencies: Dependencies = {}) {
             ...details,
           },
         })
-        return { ok: true }
+        return { ok: true, receiptStatus: details.receiptStatus }
       },
     ),
   }

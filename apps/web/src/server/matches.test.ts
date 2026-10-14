@@ -207,6 +207,64 @@ describe('admin match metadata', () => {
     expect(await response.json()).toEqual({ matches: [match] })
     expect(response.headers.get('Cache-Control')).toBe('no-store')
   })
+  it('looks up older metadata by match ID without using the latest-100 list', async () => {
+    const id = '00000000-0000-4000-8000-000000000002'
+    const olderMatch = {
+      ...match,
+      id,
+      matchId: keccak256(toBytes(`scoutreport:${id}`)),
+    }
+    vi.mocked(store.find).mockResolvedValueOnce(olderMatch)
+    const response = await createMatchRoutes({ store, getSession }).GET(
+      new Request(
+        `https://scoutreport.test/api/admin/matches?matchId=0x${olderMatch.matchId.slice(2).toUpperCase()}`,
+      ),
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ matches: [olderMatch] })
+    expect(store.find).toHaveBeenCalledWith(olderMatch.matchId)
+    expect(store.list).not.toHaveBeenCalled()
+  })
+  it('returns the same empty-list DTO when a match ID is not found', async () => {
+    vi.mocked(store.find).mockResolvedValueOnce(undefined)
+    const response = await createMatchRoutes({ store, getSession }).GET(
+      new Request(
+        `https://scoutreport.test/api/admin/matches?matchId=${matchId}`,
+      ),
+    )
+    expect(await response.json()).toEqual({ matches: [] })
+    expect(store.list).not.toHaveBeenCalled()
+  })
+  it.each(['', 'not-a-hash', '0x1234', `0x${'g'.repeat(64)}`])(
+    'rejects malformed lookup ID %s before database access',
+    async (value) => {
+      const response = await createMatchRoutes({ store, getSession }).GET(
+        new Request(
+          `https://scoutreport.test/api/admin/matches?matchId=${value}`,
+        ),
+      )
+      expect(response.status).toBe(400)
+      expect(store.find).not.toHaveBeenCalled()
+      expect(store.list).not.toHaveBeenCalled()
+    },
+  )
+  it.each([null, { ...session, address }])(
+    'authenticates lookup queries before database access or ID validation',
+    async (value) => {
+      getSession.mockResolvedValue(value)
+      const routes = createMatchRoutes({ store, getSession })
+      for (const id of [matchId, 'invalid']) {
+        const response = await routes.GET(
+          new Request(
+            `https://scoutreport.test/api/admin/matches?matchId=${id}`,
+          ),
+        )
+        expect(response.status).toBe(value ? 403 : 401)
+      }
+      expect(store.find).not.toHaveBeenCalled()
+      expect(store.list).not.toHaveBeenCalled()
+    },
+  )
   it('generates the UUID hash and UTC timestamps and supplies a single atomic create', async () => {
     const response = await createMatchRoutes({ store, getSession }).POST(
       request('POST', input),
@@ -289,11 +347,28 @@ describe('admin match metadata', () => {
 })
 
 describe('receipt-verified audits', () => {
+  it('does not acknowledge the receipt status when audit persistence fails', async () => {
+    const { routes, body } = setupAudit()
+    vi.mocked(store.audit).mockRejectedValueOnce(
+      new Error('Audit write failed'),
+    )
+    const response = await routes.audit(request('POST', body))
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({
+      code: 'INTERNAL_ERROR',
+      message: 'An unexpected error occurred',
+    })
+  })
   it.each(['createMatch', 'settle', 'voidMatch', 'creditPoints'] as const)(
     'records authentic %s calldata and event',
     async (action) => {
       const { routes, body, getClient, client } = setupAudit(action)
-      expect((await routes.audit(request('PUT', body))).status).toBe(200)
+      const response = await routes.audit(request('PUT', body))
+      expect(response.status).toBe(200)
+      expect(await response.json()).toEqual({
+        ok: true,
+        receiptStatus: 'success',
+      })
       expect(getClient).toHaveBeenCalledWith(88882)
       expect(client.readContract).toHaveBeenCalledWith(
         expect.objectContaining({ address, blockNumber: 5n }),
@@ -325,7 +400,10 @@ describe('receipt-verified audits', () => {
       )
       const response = await routes.audit(request('POST', body))
       expect(response.status).toBe(200)
-      expect(await response.json()).toEqual({ ok: true })
+      expect(await response.json()).toEqual({
+        ok: true,
+        receiptStatus: 'reverted',
+      })
       expect(client.readContract).not.toHaveBeenCalled()
       expect(store.audit).toHaveBeenCalledWith({
         actorAddress: actor,
