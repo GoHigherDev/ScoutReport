@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseSiweMessage } from 'viem/siwe'
-import { SIWE_STATEMENT } from '../copy/auth'
+import { NAMES } from '../copy/names'
 import { signIn } from './sign-in'
 
 const { getAccount, signMessage, config } = vi.hoisted(() => ({
@@ -47,7 +47,7 @@ describe('signIn', () => {
       chainId: 88888,
       version: '1',
       nonce: 'abcdefgh12345678',
-      statement: SIWE_STATEMENT,
+      statement: NAMES.auth.statement,
       issuedAt: expect.any(Date),
       expirationTime: expect.any(Date),
     })
@@ -65,14 +65,14 @@ describe('signIn', () => {
 
   it('does no work when disconnected', async () => {
     getAccount.mockReturnValue({})
-    await expect(signIn()).rejects.toThrow()
+    await expect(signIn()).rejects.toThrow(NAMES.auth.sessionRequired)
     expect(fetchMock).not.toHaveBeenCalled()
     expect(signMessage).not.toHaveBeenCalled()
   })
 
   it('does not sign when nonce issuance fails', async () => {
     fetchMock.mockReset().mockResolvedValue(Response.json({}, { status: 429 }))
-    await expect(signIn()).rejects.toThrow()
+    await expect(signIn()).rejects.toThrow(NAMES.auth.unexpectedError)
     expect(signMessage).not.toHaveBeenCalled()
   })
 
@@ -92,6 +92,6 @@ describe('signIn', () => {
         }),
       )
       .mockResolvedValueOnce(Response.json({}, { status: 401 }))
-    await expect(signIn()).rejects.toThrow('A session is required')
+    await expect(signIn()).rejects.toThrow(NAMES.auth.sessionRequired)
   })
 })

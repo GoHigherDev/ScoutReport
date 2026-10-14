@@ -37,7 +37,7 @@ trusted localhost environment or local HTTPS. Every auth response is `no-store`.
 2. Call `signIn()` from `apps/web/src/wallet/sign-in.ts` with a connected wallet.
    It builds the domain, origin URI, address, version `1`, DATA_CHAIN chain ID,
    nonce, issued-at and server-provided expiry. The copy comes from
-   `apps/web/src/copy/auth.ts`, exactly:
+   `NAMES.auth.statement` in `apps/web/src/copy/names.ts`, exactly:
 
    > Sign in to ScoutReport. This does not cost gas or move funds.
 

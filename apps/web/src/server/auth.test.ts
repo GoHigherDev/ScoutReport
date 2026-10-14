@@ -16,7 +16,7 @@ import {
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { createSiweMessage } from 'viem/siwe'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SIWE_STATEMENT } from '../copy/auth'
+import { NAMES } from '../copy/names'
 import { requireAdmin } from './admin'
 import { toStoredAddress } from './address'
 import { createAuthRoutes } from './auth'
@@ -148,7 +148,7 @@ async function challenge(
     nonce,
     issuedAt: new Date(),
     expirationTime: new Date(expiresAt),
-    statement: SIWE_STATEMENT,
+    statement: NAMES.auth.statement,
     ...overrides,
   })
   return { nonce, message, cookie: cookieFrom(response), response }

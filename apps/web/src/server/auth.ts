@@ -4,7 +4,7 @@ import { getPublicClient } from '@scoutreport/chain'
 import { isErc6492Signature } from 'viem'
 import { parseSiweMessage, validateSiweMessage } from 'viem/siwe'
 import { z } from 'zod'
-import { SIWE_STATEMENT } from '../copy/auth'
+import { NAMES } from '../copy/names'
 import { toStoredAddress } from './address'
 import { handler, HttpError, type RateLimiter } from './http'
 import { getVerifiedSession, readSession } from './session'
@@ -91,7 +91,7 @@ export const createAuthRoutes = (options: AuthOptions = {}) => {
           parsed.uri !== origin.origin ||
           (parsed.scheme !== undefined &&
             parsed.scheme !== origin.protocol.slice(0, -1)) ||
-          parsed.statement !== SIWE_STATEMENT ||
+          parsed.statement !== NAMES.auth.statement ||
           !parsed.issuedAt ||
           !Number.isFinite(parsed.issuedAt.getTime()) ||
           parsed.issuedAt > now ||
