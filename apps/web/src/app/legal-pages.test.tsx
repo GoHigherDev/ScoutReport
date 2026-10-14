@@ -54,7 +54,7 @@ describe('static legal drafts', () => {
     for (const phrase of [
       'An append-only audit log records picks and signatures',
       'Predict aggregates are anonymised after 24 months.',
-      'wallet address, terms version, UTC time, country-check result',
+      'The terms-acceptance record contains your wallet address, the terms version, the UTC time and the country-check result. We use it to record which terms you accepted and to check eligibility.',
       'The IP country check is done on our server; raw IP is not stored.',
       'Reported RP is sent only with your consent, which you can withdraw',
       'The RP Estimate panel shows holdings only and assumes a Socios Wallet based on your declaration',
@@ -81,7 +81,7 @@ describe('static legal drafts', () => {
       'You must be 18 or over to use ScoutReport.',
     )
     expect(screen.getByRole('main')).toHaveTextContent(
-      'wallet address, terms version, UTC time, country-check result',
+      'When you accept the terms, we record your wallet address, the terms version, the UTC time and the country-check result.',
     )
     expect(screen.getByRole('main')).toHaveTextContent(
       'The IP country check is done on our server; raw IP is not stored.',

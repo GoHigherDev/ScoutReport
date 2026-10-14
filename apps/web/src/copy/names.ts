@@ -49,7 +49,7 @@ export const NAMES = {
       },
       {
         heading: 'Terms acceptance and country check',
-        text: 'The terms-acceptance record contains wallet address, terms version, UTC time, country-check result, to record which terms were accepted and check eligibility. The IP country check is done on our server; raw IP is not stored. [LAWFUL BASIS FOR TERMS ACCEPTANCE AND COUNTRY CHECK — TO BE CONFIRMED]. Contact the privacy contact for questions about these records.',
+        text: 'The terms-acceptance record contains your wallet address, the terms version, the UTC time and the country-check result. We use it to record which terms you accepted and to check eligibility. The IP country check is done on our server; raw IP is not stored. [LAWFUL BASIS FOR TERMS ACCEPTANCE AND COUNTRY CHECK — TO BE CONFIRMED]. Contact the privacy contact for questions about these records.',
       },
       {
         heading: 'Automated decisions',
@@ -81,7 +81,7 @@ export const NAMES = {
       },
       {
         heading: 'Draft scope',
-        text: 'These terms are a draft pending legal review. [SERVICE TERMS, ELIGIBILITY AND GOVERNING LAW — TO BE CONFIRMED]. A wallet signature is required to sign in; signing in costs no gas and does not move funds. Predict picks are free, off-chain and wallet-signed with no gas. We record wallet address, terms version, UTC time, country-check result when you accept the terms. The IP country check is done on our server; raw IP is not stored. Contact the privacy contact with questions about the terms or your records.',
+        text: 'These terms are a draft pending legal review. [SERVICE TERMS, ELIGIBILITY AND GOVERNING LAW — TO BE CONFIRMED]. A wallet signature is required to sign in; signing in costs no gas and does not move funds. Predict picks are free, off-chain and wallet-signed with no gas. When you accept the terms, we record your wallet address, the terms version, the UTC time and the country-check result. The IP country check is done on our server; raw IP is not stored. Contact the privacy contact with questions about the terms or your records.',
       },
       {
         heading: '18+ eligibility',
