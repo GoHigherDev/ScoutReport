@@ -104,6 +104,16 @@ BEGIN
      OR pseudonym IS NULL OR pseudonym !~ '^erased:[0-9a-f]{64}$' THEN
     RAISE EXCEPTION 'invalid erasure parameters';
   END IF;
+  -- Match writers lock the parent before scoring or auditing. Lock first so
+  -- their committed rows are visible to the subsequent erasure statements.
+  PERFORM id FROM matches
+    WHERE created_by = wallet OR settled_by = wallet OR voided_by = wallet
+      OR id IN (
+        SELECT match_id FROM picks WHERE address = wallet
+        UNION SELECT match_id FROM prediction_points WHERE address = wallet
+        UNION SELECT match_id FROM prediction_audit WHERE address = wallet
+      )
+    ORDER BY id FOR UPDATE;
   PERFORM set_config('scoutreport.erasure_wallet', wallet, true);
   PERFORM set_config('scoutreport.erasure_pseudonym', pseudonym, true);
   DELETE FROM picks WHERE address = wallet;

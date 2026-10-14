@@ -162,6 +162,50 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     }
   })
 
+  it('waits for concurrent match writers before scanning their identifying audit rows', async () => {
+    const { address, other, matchId, signature } = await fixture()
+    const auditId = randomUUID()
+    let erasure: Promise<void> | undefined
+    await client.begin(async (writer) => {
+      await writer`SELECT id FROM matches WHERE id = ${matchId} FOR UPDATE`
+      erasure = erasePredictData(address)
+      const deadline = Date.now() + 5000
+      let waiting = false
+      while (Date.now() < deadline) {
+        await writer`SELECT pg_stat_clear_snapshot()`
+        const [status] = await writer`
+          SELECT EXISTS (
+            SELECT 1 FROM pg_stat_activity
+            WHERE wait_event_type = 'Lock' AND pid <> pg_backend_pid()
+              AND query LIKE '%erase_predict_data%'
+          ) AS waiting
+        `
+        if (status.waiting) {
+          waiting = true
+          break
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+      expect(waiting).toBe(true)
+      await writer`
+        INSERT INTO admin_audit_log (id, actor_address, action, payload)
+        VALUES (${auditId}, ${other}, 'matches.edit',
+          ${JSON.stringify({ before: { createdBy: address }, signature })}::jsonb)
+      `
+    })
+    await erasure
+    const [audit] =
+      await client`SELECT payload FROM admin_audit_log WHERE id = ${auditId}`
+    expect(
+      typeof audit.payload === 'string'
+        ? JSON.parse(audit.payload)
+        : audit.payload,
+    ).toEqual({ erased: true })
+    expect(
+      await client`SELECT * FROM prediction_points WHERE address = ${address}`,
+    ).toHaveLength(0)
+  }, 10_000)
+
   it('authenticates a real encrypted session and enforces a shared database rate limit', async () => {
     const address =
       privateKeyToAccount(generatePrivateKey()).address.toLowerCase()

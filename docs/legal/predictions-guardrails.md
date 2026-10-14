@@ -42,7 +42,7 @@ with that header overwritten, and must not expose an alternative ingress that
 preserves a client-supplied value. Merely setting `VERCEL=1` on another host is
 **not** a trust mechanism. A different platform requires a reviewed, server-side
 resolver and spoofing tests before enablement. Raw IP is neither stored nor logged.
-Missing/malformed/`XX` countries fail closed in production; non-production may
+Missing/non-ISO/`XX` countries fail closed in production; non-production may
 use an unknown result for local testing. Country is checked again for every
 pick, never just at terms acceptance.
 
@@ -75,7 +75,9 @@ mapping. This is pseudonymisation, not a claim of irreversible anonymisation:
 restrict secret access, retention and backups separately.
 
 Migration `0003_predict_guardrails.sql` installs `erase_predict_data`, invoked
-in one transaction. It deletes picks (including signatures), points,
+in one transaction. It first locks affected matches in ID order, serialising
+with existing scoring/admin writers before scanning their committed audit rows.
+It deletes picks (including signatures), points,
 terms/18+ records, Predict nonces, wallet-linked SIWE nonces and rate-limit
 rows. It nulls Predict audit signatures, replaces wallet columns with the
 keyed digest and removes entire identifying admin audit payloads, including

@@ -78,6 +78,9 @@ afterEach(() => {
 })
 
 describe('free-to-play eligibility', () => {
+  it('keeps the displayed legal revision aligned with the required terms version', () => {
+    expect(NAMES.legal.revision).toContain(`Version: ${PREDICT_TERMS_VERSION}`)
+  })
   it('requires a session before database work', async () => {
     await expect(
       assertPickEligibility(null, request(), store),
@@ -112,7 +115,7 @@ describe('free-to-play eligibility', () => {
       expect(store.hasAgeConfirmation).not.toHaveBeenCalled()
     },
   )
-  it.each(['', 'XX', 'unknown'])(
+  it.each(['', 'XX', 'ZZ', 'EU', 'unknown'])(
     'fails closed for unknown production country %s',
     async (country) => {
       vi.stubEnv('NODE_ENV', 'production')
@@ -147,7 +150,7 @@ describe('free-to-play eligibility', () => {
   it('uses validated server configuration, never an empty allow-all list', () => {
     vi.stubEnv('PREDICT_BLOCKED_COUNTRIES', 'US, GB')
     expect([...blockedPredictCountries()]).toEqual(['US', 'GB'])
-    for (const invalid of ['', 'us', 'USA', 'US,']) {
+    for (const invalid of ['', 'us', 'USA', 'US,', 'ZZ']) {
       vi.stubEnv('PREDICT_BLOCKED_COUNTRIES', invalid)
       expect(blockedPredictCountries).toThrow()
     }
@@ -306,7 +309,10 @@ describe('no prize or redeemable-value path', () => {
       )
     }
     const src = new URL('../', import.meta.url)
-    for (const file of readdirSync(src, { recursive: true })) {
+    for (const file of readdirSync(src, {
+      recursive: true,
+      encoding: 'utf8',
+    })) {
       if (!/\.[jt]sx?$/.test(file) || file.includes('.test.')) continue
       const source = readFileSync(new URL(file, src), 'utf8')
       expect(source, file).not.toMatch(
