@@ -25,7 +25,10 @@ Existing contract experiments are not part of this Predict flow.
   of birth or IP from the client.
 - Both endpoints validate Origin against `NEXT_PUBLIC_SITE_URL`, decrypt and
   validate the SIWE session, then consume a shared Postgres rate limit of
-  20 requests per wallet per minute shared with the SR-45 Predict endpoints.
+  20 requests per wallet per minute shared with the SR-45 nonce/pick write endpoints.
+  Match, personal-prediction and eligibility reads have a separate shared
+  Postgres bucket of 20 requests per wallet per minute, so paging cannot consume
+  the write allowance. Both buckets authenticate before limiter DB work.
   Authentication and Origin rejection occur **before any paid DB work**, including rate limiting.
   The bounded bodies are validated before acceptance writes. Responses are
   `no-store`; failures use existing 400/401/403/429/500 response conventions.
@@ -33,17 +36,22 @@ Existing contract experiments are not part of this Predict flow.
 - SR-45 adds authenticated match, personal-prediction and eligibility reads,
   plus same-origin nonce and signed-pick writes. EIP-712 binds the match, outcome
   and single-use nonce to the site and session chain. ERC-1271 verification uses
-  the session address and chain; EOA verification needs no RPC. Match locks,
+  the session address and chain; EOA verification needs no RPC. Nonce and match
+  preflight reads take no locks; signature verification runs before the write
+  transaction, so a slow ERC-1271 response cannot hold wallet or match locks.
+  The write transaction rechecks eligibility, nonce ownership/expiry and match
+  availability after verification. Match locks,
   server-time deadline checks, nonce consumption, current pick and signed audit
   insertion are transactional. No gas/network guard or transaction is used.
 - Rate-limit rows hold wallet, count and expiry, not IP. Expiry resets the
   counter on the next request. Each authenticated shared
   limiter call also deletes at most 100 other rows whose expiry is over an hour
   old, oldest first, using the expiry index and skipping locked rows. Active and
-  recently expired limits are not removed. The current wallet is excluded from
+  recently expired limits are not removed. The current bucket key is excluded from
   cleanup and its expired counter is reset atomically. This opportunistic purge
   needs request traffic; it is not a scheduled TTL or a fixed deletion deadline.
-  Erasure also deletes the wallet's row.
+  Migration `0005_predict_read_limit_erasure.sql` makes erasure delete both the
+  wallet and `read:`-prefixed wallet rows, including for direct SQL callers.
 
 ## Trusted country configuration
 

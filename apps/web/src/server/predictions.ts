@@ -28,6 +28,7 @@ import {
   assertPredictCountry,
   lockPredictWallet,
   predictAcceptanceLimiter,
+  predictReadLimiter,
   predictEligibilityStore,
   requirePredictOrigin,
   type PredictEligibilityStore,
@@ -308,6 +309,43 @@ export const predictionStore: PredictionStore = {
   },
   async submit(input, session, request, verify) {
     const origin = requirePredictOrigin(request)
+    const db = getDatabase()
+    const [preflight] = await db
+      .select({ match: matches, now: sql<string>`clock_timestamp()` })
+      .from(matches)
+      .where(eq(matches.id, input.matchId))
+      .limit(1)
+    if (!preflight)
+      throw new HttpError(409, 'CONFLICT', NAMES.predict.matchUnavailable)
+    assertPredictionOpen(preflight.match, new Date(preflight.now))
+    if (!preflight.match.outcomes.includes(input.outcome))
+      throw new HttpError(400, 'INVALID_REQUEST', NAMES.predict.invalidOutcome)
+    const nonce = await db
+      .select({ nonce: predictNonces.nonce })
+      .from(predictNonces)
+      .where(
+        and(
+          eq(predictNonces.nonce, input.nonce),
+          eq(predictNonces.address, session.address),
+          gt(predictNonces.expiresAt, sql`clock_timestamp()`),
+        ),
+      )
+      .limit(1)
+    if (!nonce.length)
+      throw new HttpError(409, 'CONFLICT', NAMES.predict.invalidNonce)
+    // ERC-1271 verification may be slow: never hold wallet or match locks over RPC.
+    let valid: boolean
+    try {
+      valid = await verify(session, input, origin)
+    } catch {
+      valid = false
+    }
+    if (!valid)
+      throw new HttpError(
+        400,
+        'INVALID_REQUEST',
+        NAMES.predict.invalidSignature,
+      )
     return getDatabase().transaction(async (tx) => {
       await lockPredictWallet(tx, session.address)
       const match = await openMatch(tx, input)
@@ -326,18 +364,6 @@ export const predictionStore: PredictionStore = {
       if (!consumed.length)
         throw new HttpError(409, 'CONFLICT', NAMES.predict.invalidNonce)
       await assertPickEligibility(session, request, transactionEligibility(tx))
-      let valid: boolean
-      try {
-        valid = await verify(session, input, origin)
-      } catch {
-        valid = false
-      }
-      if (!valid)
-        throw new HttpError(
-          400,
-          'INVALID_REQUEST',
-          NAMES.predict.invalidSignature,
-        )
       const now = await serverTime(tx)
       assertPredictionOpen(match, now)
       const values = {
@@ -367,6 +393,7 @@ type RouteOptions = {
   store?: PredictionStore
   eligibilityStore?: PredictEligibilityStore
   rateLimiter?: RateLimiter
+  readRateLimiter?: RateLimiter
   verifySignature?: VerifySignature
 }
 
@@ -381,7 +408,9 @@ export function createPredictionRoutes(options: RouteOptions = {}) {
   }
   const limited = (write = false) => ({
     auth: true,
-    rateLimiter: options.rateLimiter ?? predictAcceptanceLimiter,
+    rateLimiter: write
+      ? (options.rateLimiter ?? predictAcceptanceLimiter)
+      : (options.readRateLimiter ?? predictReadLimiter),
     rateLimitKey: async (request: Request) => {
       const value = await session(request)
       if (write) {

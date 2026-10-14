@@ -11,6 +11,7 @@ import { createPredictAcceptanceRoutes, erasePredictData } from './predict'
 import { PREDICT_TERMS_VERSION } from './predict-config'
 import { readSession } from './session'
 import { pickTypedData } from '../lib/predict'
+import { NAMES } from '../copy/names'
 import {
   createPredictionRoutes,
   predictionStore,
@@ -113,7 +114,9 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     await client`INSERT INTO predict_terms_acceptances (address, version, country, country_check) VALUES (${address}, ${PREDICT_TERMS_VERSION}, 'ES', 'allowed')`
     await client`INSERT INTO predict_nonces (nonce, address, expires_at) VALUES (${randomUUID()}, ${address}, now() + interval '10 minutes')`
     await client`INSERT INTO siwe_nonces (nonce, address, expires_at) VALUES (${randomUUID()}, ${address}, now() + interval '10 minutes')`
-    await client`INSERT INTO predict_rate_limits (address, count, expires_at) VALUES (${address}, 1, now() + interval '1 minute')`
+    await client`INSERT INTO predict_rate_limits (address, count, expires_at) VALUES
+      (${address}, 1, now() + interval '1 minute'),
+      (${'read:' + address}, 1, now() + interval '1 minute')`
     await client`INSERT INTO prediction_audit (address, match_id, outcome, signature) VALUES (${address}, ${matchId}, 'HOME', ${signature})`
     await client`INSERT INTO admin_audit_log (actor_address, action, payload) VALUES (${address}, 'matches.create', ${JSON.stringify({ after: { createdBy: account.address }, signature })}::jsonb)`
     await client`INSERT INTO admin_audit_log (actor_address, action, payload) VALUES (${other}, 'matches.edit', ${JSON.stringify({ before: { createdBy: account.address } })}::jsonb)`
@@ -128,6 +131,9 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
       ).toLowerCase(),
     ).toBe(address)
     await erasePredictData(address)
+    expect(
+      await client`SELECT * FROM predict_rate_limits WHERE address = ${'read:' + address}`,
+    ).toHaveLength(0)
     for (const table of [
       'picks',
       'prediction_points',
@@ -383,6 +389,278 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     }
     return { account, address, matchId, session, request, signed }
   }
+
+  it('shares independent read and write budgets across route instances and accounts', async () => {
+    const f = await pickFixture()
+    const authenticated = await authenticatedRequest(f.address)
+    const reads = ['list', 'mine', 'eligibility'] as const
+    for (let count = 0; count < 20; count++) {
+      const routes = createPredictionRoutes()
+      expect((await routes[reads[count % 3]](authenticated({}))).status).toBe(
+        200,
+      )
+    }
+    for (const route of reads) {
+      expect(
+        (await createPredictionRoutes()[route](authenticated({}))).status,
+      ).toBe(429)
+    }
+    const acceptance = createPredictAcceptanceRoutes()
+    expect(
+      (await acceptance.confirmAge(authenticated({ confirmed: true }))).status,
+    ).toBe(200)
+    expect(
+      (
+        await acceptance.acceptTerms(
+          authenticated({ version: PREDICT_TERMS_VERSION }),
+        )
+      ).status,
+    ).toBe(200)
+    const nonceResponse = await createPredictionRoutes().nonce(
+      authenticated({ matchId: f.matchId, outcome: 'HOME' }),
+    )
+    expect(nonceResponse.status).toBe(200)
+    const { nonce } = await nonceResponse.json()
+    const message = { matchId: f.matchId, outcome: 'HOME', nonce }
+    const signature = await f.account.signTypedData(
+      pickTypedData(origin, 88882, message),
+    )
+    expect(
+      (
+        await createPredictionRoutes().pick(
+          authenticated({ ...message, signature }),
+        )
+      ).status,
+    ).toBe(200)
+    for (let count = 4; count < 20; count++) {
+      expect(
+        (await acceptance.confirmAge(authenticated({ confirmed: true })))
+          .status,
+      ).toBe(200)
+    }
+    expect(
+      (await acceptance.confirmAge(authenticated({ confirmed: true }))).status,
+    ).toBe(429)
+    await client`UPDATE predict_rate_limits SET expires_at = clock_timestamp() - interval '1 second'
+      WHERE address = ${'read:' + f.address}`
+    expect(
+      (await createPredictionRoutes().mine(authenticated({}))).status,
+    ).toBe(200)
+    expect(
+      (await createPredictionRoutes().nonce(authenticated(message))).status,
+    ).toBe(429)
+    const other = await pickFixture()
+    const otherRequest = await authenticatedRequest(other.address)
+    expect((await createPredictionRoutes().list(otherRequest({}))).status).toBe(
+      200,
+    )
+    expect(
+      (await acceptance.confirmAge(otherRequest({ confirmed: true }))).status,
+    ).toBe(200)
+    await directErasure(f.address)
+    expect(
+      await client`SELECT * FROM predict_rate_limits WHERE address IN (${f.address}, ${'read:' + f.address})`,
+    ).toHaveLength(0)
+    await erasePredictData(other.address)
+  })
+
+  it('rejects invalid preflight data without invoking a verifier or consuming the nonce', async () => {
+    const f = await pickFixture()
+    const pick = await f.signed()
+    const verify = vi.fn(async () => true)
+    for (const [input, status] of [
+      [{ ...pick, matchId: randomUUID() }, 409],
+      [{ ...pick, nonce: randomBytes(32).toString('hex') }, 409],
+      [{ ...pick, outcome: 'INVALID' }, 400],
+    ] as const) {
+      await expect(
+        predictionStore.submit(input, f.session, f.request, verify),
+      ).rejects.toMatchObject({ status })
+    }
+    const other = await pickFixture()
+    await expect(
+      predictionStore.submit(pick, other.session, f.request, verify),
+    ).rejects.toMatchObject({ status: 409 })
+    await client`UPDATE predict_nonces SET expires_at = clock_timestamp() WHERE nonce = ${pick.nonce}`
+    await expect(
+      predictionStore.submit(pick, f.session, f.request, verify),
+    ).rejects.toMatchObject({ status: 409 })
+    const replacement = await f.signed()
+    await client`UPDATE matches SET lock_at_utc = clock_timestamp() WHERE id = ${f.matchId}`
+    await expect(
+      predictionStore.submit(replacement, f.session, f.request, verify),
+    ).rejects.toMatchObject({ status: 409 })
+    await client`UPDATE matches SET status = 'settled', result = 'HOME' WHERE id = ${f.matchId}`
+    await expect(
+      predictionStore.submit(replacement, f.session, f.request, verify),
+    ).rejects.toMatchObject({ status: 409 })
+    expect(verify).not.toHaveBeenCalled()
+    await erasePredictData(f.address)
+    await erasePredictData(other.address)
+  })
+
+  it('maps verifier failures safely without consuming a nonce or recording a pick', async () => {
+    const f = await pickFixture()
+    const pick = await f.signed()
+    const authenticated = await authenticatedRequest(f.address)
+    const routes = createPredictionRoutes({
+      verifySignature: async () => {
+        throw new Error('Internal RPC diagnostic must not reach the client')
+      },
+    })
+    const response = await routes.pick(authenticated(pick))
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      code: 'INVALID_REQUEST',
+      message: NAMES.predict.invalidSignature,
+    })
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE nonce = ${pick.nonce}`,
+    ).toHaveLength(1)
+    expect(
+      await client`SELECT * FROM picks WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    expect(
+      await client`SELECT * FROM prediction_audit WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    await erasePredictData(f.address)
+  })
+
+  function pausedVerifier() {
+    let entered!: () => void
+    let resume!: () => void
+    const started = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const released = new Promise<void>((resolve) => {
+      resume = resolve
+    })
+    return {
+      started,
+      resume,
+      verify: async () => {
+        entered()
+        await released
+        return true
+      },
+    }
+  }
+
+  async function within<T>(promise: Promise<T>): Promise<T> {
+    let timer!: ReturnType<typeof setTimeout>
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('Operation blocked by verification')),
+            3000,
+          )
+        }),
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  it('does not block another wallet picking or settlement while signature verification is paused', async () => {
+    const f = await pickFixture()
+    const other = await pickFixture()
+    const pick = await f.signed()
+    const selection = { matchId: f.matchId, outcome: 'AWAY' }
+    const { nonce } = await predictionStore.issueNonce(
+      selection,
+      other.session,
+      other.request,
+    )
+    const message = { ...selection, nonce }
+    const signature = await other.account.signTypedData(
+      pickTypedData(origin, 88882, message),
+    )
+    const paused = pausedVerifier()
+    const pending = predictionStore.submit(
+      pick,
+      f.session,
+      f.request,
+      paused.verify,
+    )
+    void pending.catch(() => {})
+    try {
+      await within(paused.started)
+      await within(
+        predictionStore.submit(
+          { ...message, signature },
+          other.session,
+          other.request,
+          verifyPickSignature,
+        ),
+      )
+      await within(
+        client.begin(async (tx) => {
+          await tx`SELECT id FROM matches WHERE id = ${f.matchId} FOR UPDATE`
+          await tx`UPDATE matches SET status = 'settled', result = 'AWAY', lock_at_utc = clock_timestamp()
+          WHERE id = ${f.matchId}`
+        }),
+      )
+    } finally {
+      paused.resume()
+    }
+    await expect(pending).rejects.toMatchObject({ status: 409 })
+    expect(
+      await client`SELECT * FROM picks WHERE address = ${f.address}`,
+    ).toHaveLength(0)
+    expect(
+      await client`SELECT * FROM predict_nonces WHERE nonce = ${pick.nonce}`,
+    ).toHaveLength(1)
+    await erasePredictData(f.address)
+    await erasePredictData(other.address)
+  }, 10_000)
+
+  it.each(['erasure', 'replay', 'expiry', 'eligibility', 'outcome'] as const)(
+    'revalidates %s after slow verification',
+    async (change) => {
+      const f = await pickFixture()
+      const pick = await f.signed()
+      const paused = pausedVerifier()
+      const pending = predictionStore.submit(
+        pick,
+        f.session,
+        f.request,
+        paused.verify,
+      )
+      void pending.catch(() => {})
+      try {
+        await within(paused.started)
+        if (change === 'erasure') await within(directErasure(f.address))
+        if (change === 'replay')
+          await within(
+            predictionStore.submit(
+              pick,
+              f.session,
+              f.request,
+              verifyPickSignature,
+            ),
+          )
+        if (change === 'expiry')
+          await client`UPDATE predict_nonces SET expires_at = clock_timestamp() WHERE nonce = ${pick.nonce}`
+        if (change === 'eligibility')
+          await client`DELETE FROM predict_terms_acceptances WHERE address = ${f.address}`
+        if (change === 'outcome')
+          await client`UPDATE matches SET outcomes = '["AWAY","DRAW"]' WHERE id = ${f.matchId}`
+      } finally {
+        paused.resume()
+      }
+      await expect(pending).rejects.toMatchObject({
+        status:
+          change === 'eligibility' ? 403 : change === 'outcome' ? 400 : 409,
+      })
+      expect(
+        await client`SELECT * FROM prediction_audit WHERE address = ${f.address}`,
+      ).toHaveLength(change === 'replay' ? 1 : 0)
+      await erasePredictData(f.address)
+    },
+    10_000,
+  )
 
   it('stores real EIP-712 signatures on picks and append-only audit, changes picks, and rejects atomic replay', async () => {
     const f = await pickFixture()
@@ -753,7 +1031,10 @@ describe.skipIf(!url)('Predict PostgreSQL guardrails and erasure', () => {
     })
     const [limit] =
       await client`SELECT count FROM predict_rate_limits WHERE address = ${f.address}`
-    expect(limit.count).toBe(3)
+    expect(limit.count).toBe(1)
+    const [readLimit] =
+      await client`SELECT count FROM predict_rate_limits WHERE address = ${'read:' + f.address}`
+    expect(readLimit.count).toBe(2)
     const other =
       privateKeyToAccount(generatePrivateKey()).address.toLowerCase()
     expect((await predictionStore.mine(other, null)).matches).toHaveLength(0)

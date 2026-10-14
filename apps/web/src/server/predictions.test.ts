@@ -35,6 +35,7 @@ let session: VerifiedSession
 let store: PredictionStore
 let eligibility: PredictEligibilityStore
 let limiter: MemoryRateLimiter
+let readLimiter: MemoryRateLimiter
 let routes: ReturnType<typeof createPredictionRoutes>
 const input = { matchId: randomUUID(), outcome: 'HOME' }
 
@@ -87,14 +88,17 @@ beforeEach(() => {
     acceptTerms: vi.fn(),
   }
   limiter = new MemoryRateLimiter(20)
+  readLimiter = new MemoryRateLimiter(20)
   routes = createPredictionRoutes({
     store,
     eligibilityStore: eligibility,
     rateLimiter: limiter,
+    readRateLimiter: readLimiter,
   })
 })
 afterEach(() => {
   limiter.dispose()
+  readLimiter.dispose()
   vi.clearAllMocks()
   vi.unstubAllEnvs()
 })
@@ -193,20 +197,21 @@ describe('authenticated and bounded Predict API', () => {
     expect(rpc.client).not.toHaveBeenCalled()
     for (const fn of Object.values(store)) expect(fn).not.toHaveBeenCalled()
   })
-  it('shares per-account limiting across match, mine, eligibility, nonce and pick routes', async () => {
+  it('shares read limiting across match, mine and eligibility independently of writes', async () => {
     limiter.dispose()
+    readLimiter.dispose()
     limiter = new MemoryRateLimiter(1)
+    readLimiter = new MemoryRateLimiter(1)
     routes = createPredictionRoutes({
       store,
       eligibilityStore: eligibility,
       rateLimiter: limiter,
+      readRateLimiter: readLimiter,
     })
     expect((await routes.list(request())).status).toBe(200)
     for (const [route, req] of [
       [routes.mine, request()],
       [routes.eligibility, request()],
-      [routes.nonce, request('POST', input)],
-      [routes.pick, request('POST', signedBody)],
     ] as const) {
       const response = await route(req)
       expect(response.status).toBe(429)
@@ -214,6 +219,8 @@ describe('authenticated and bounded Predict API', () => {
       expect(response.headers.get('Cache-Control')).toBe('no-store')
     }
     expect(store.mine).not.toHaveBeenCalled()
+    expect((await routes.nonce(request('POST', input))).status).toBe(200)
+    expect((await routes.pick(request('POST', signedBody))).status).toBe(429)
     expect(store.submit).not.toHaveBeenCalled()
   })
   it.each(['US', ''])(

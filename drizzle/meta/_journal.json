@@ -36,6 +36,13 @@
       "when": 1791986390907,
       "tag": "0004_predict_wallet_serialisation",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791988824101,
+      "tag": "0005_predict_read_limit_erasure",
+      "breakpoints": true
     }
   ]
 }

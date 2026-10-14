@@ -59,16 +59,23 @@ collected in production. Expiry timestamps alone do not delete rows.
 | `predict_terms_acceptances.address` / `version` / `accepted_at` | Wallet, terms version and first UTC acceptance time                                    | Until Predict erasure; approved retention pending                 |
 | `predict_terms_acceptances.country` / `country_check`           | Trusted platform country code or null, and allowed/unknown result; never raw IP        | Same as acceptance row                                            |
 | `predict_nonces.nonce` / `address` / `expires_at`               | Wallet-linked single-use EIP-712 replay protection                                      | Deleted on successful pick submission, cleanup or Predict erasure |
-| `predict_rate_limits.address` / `count` / `expires_at`          | Shared authenticated Predict limit; count resets after a minute on the next request    | Erasure or opportunistic cleanup; see policy below                |
+| `predict_rate_limits.address` / `count` / `expires_at`          | Separate authenticated Predict read/write buckets; count resets after a minute on the next request | Erasure or opportunistic cleanup; see policy below                |
 | `prediction_audit.id` / `match_id` / `outcome` / `created_at`   | Append-only event for each accepted pick and change                                    | Retained after erasure; approved retention pending                |
 | `prediction_audit.address` / `signature`                        | Wallet and nullable EIP-712 signature                                                  | Erasure replaces address with keyed pseudonym and nulls signature |
 
 Each authenticated Predict request using the shared limiter opportunistically
 deletes up to 100 other rate-limit rows expired for over an hour, oldest first,
-skipping locked rows. Active/recent limits remain; the current wallet is excluded and its counter
-is reset on expiry. No scheduled TTL exists: cleanup depends on traffic and rows
+skipping locked rows. Active/recent limits remain; the current bucket key is
+excluded and its counter is reset on expiry. No scheduled TTL exists:
+cleanup depends on traffic and rows
 can remain longer when there is no traffic, a backlog or a lock. Wallet erasure
-also removes its rate-limit row.
+also removes both rate-limit rows. Reads use a `read:`-prefixed wallet key;
+writes use the wallet address. Both buckets are shared across server instances
+and each permits 20 requests per wallet per minute. Reads cannot spend the
+nonce/pick/acceptance write allowance. These keys remain wallet-linked personal
+data, not anonymous identifiers. Migration `0005_predict_read_limit_erasure.sql`
+removes both keys through the existing database erasure function, including
+direct SQL calls.
 
 Predict challenges expire after ten minutes. Issuance replaces any outstanding
 challenge for that wallet and deletes up to 100 expired challenges, skipping
@@ -101,11 +108,15 @@ authorised erasure operators, never exposed in client bundles/logs or committed)
 Identifying admin audit payloads are redacted
 entirely, including signature copies and mixed-case wallet references.
 Retained keyed pseudonyms are not claimed to be anonymous.
-Predict endpoints require SIWE before database/RPC work and use a shared
-Postgres per-account rate limit. Writes require the same Origin. Each pick and
+Predict endpoints require SIWE before database/RPC work and use separate shared
+Postgres per-account read/write rate limits. Writes require the same Origin. Each pick and
 change is checked against SR-41 eligibility and the server's lock deadline;
 the current pick and signed audit event are saved atomically with nonce
-consumption.
+consumption. Nonce ownership/expiry and match availability are checked without
+locks before signature verification. Verification, including ERC-1271 RPC,
+runs before the write transaction. The locked transaction rechecks match state,
+server time, nonce ownership/expiry and eligibility, rejecting any settlement,
+erasure, replay or deadline change while verification was pending.
 Read APIs return matches and the session wallet's picks/results/points, never
 stored signatures or other wallets' picks. Terms records include country
 code/result from

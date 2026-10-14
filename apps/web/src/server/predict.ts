@@ -205,6 +205,12 @@ export const predictAcceptanceLimiter: RateLimiter = {
   },
 }
 
+export const predictReadLimiter: RateLimiter = {
+  consume(address) {
+    return predictAcceptanceLimiter.consume(`read:${address}`)
+  },
+}
+
 type DbTransaction = Parameters<
   Parameters<ReturnType<typeof getDatabase>['transaction']>[0]
 >[0]
