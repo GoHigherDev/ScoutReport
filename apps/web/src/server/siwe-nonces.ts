@@ -4,10 +4,12 @@ import { getDatabase } from './db'
 import { siweNonces } from './db/schema'
 
 export const nonceStore = {
-  async issue(nonce: string, expiresAt: Date, now: Date) {
+  async issue(nonce: string, expiresAt: Date, now: Date, address?: string) {
     const db = getDatabase()
     await db.delete(siweNonces).where(lte(siweNonces.expiresAt, now))
-    await db.insert(siweNonces).values({ nonce, expiresAt })
+    await db
+      .insert(siweNonces)
+      .values({ nonce, expiresAt, ...(address ? { address } : {}) })
   },
   async find(nonce: string) {
     const [row] = await getDatabase()
@@ -17,10 +19,10 @@ export const nonceStore = {
       .limit(1)
     return row
   },
-  async consume(nonce: string, now: Date) {
+  async consume(nonce: string, now: Date, address?: string) {
     const rows = await getDatabase()
       .update(siweNonces)
-      .set({ usedAt: now })
+      .set({ usedAt: now, ...(address ? { address } : {}) })
       .where(
         and(
           eq(siweNonces.nonce, nonce),

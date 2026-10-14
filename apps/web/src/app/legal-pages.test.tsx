@@ -18,9 +18,10 @@ describe('static legal drafts', () => {
         "For users 18 or over; we do not knowingly process children's data.",
       )
       expect(screen.getByText(NAMES.legal.revision)).toHaveTextContent(
-        'Last updated: 14 October 2026 · Version: 0.2',
+        'Last updated: 14 October 2026 · Version: 0.3',
       )
       const text = screen.getByRole('main').textContent
+      expect(text).not.toContain('[FREE_TO_PLAY_BANNER]')
       expect(text).not.toMatch(
         /SR-\d+|R-\d+|S-05|P-01|schema|DELETE \/api\/profile/,
       )
@@ -37,7 +38,7 @@ describe('static legal drafts', () => {
     expect(
       screen.getByText(NAMES.legal.privacySections[3].text),
     ).toHaveTextContent(
-      'we delete your picks, prediction points, terms-acceptance records and stored signatures, and pseudonymise your audit-log entries, which are kept.',
+      'we delete your picks, prediction points, terms-acceptance and 18+ records, wallet-linked nonces and stored signatures, and pseudonymise your audit-log entries, which are kept.',
     )
     expect(
       screen.getByText(NAMES.legal.privacySections[1].text),
@@ -59,10 +60,11 @@ describe('static legal drafts', () => {
     render(<PrivacyPage />)
     const text = screen.getByRole('main').textContent
     for (const phrase of [
-      'An append-only audit log records picks and signatures',
+      'Audit-log entries are not edited, except that on erasure your address is pseudonymised and signatures are removed.',
       'Predict aggregates are anonymised after 24 months.',
-      'The terms-acceptance record contains your wallet address, the terms version, the UTC time and the country-check result. We use it to record which terms you accepted and to check eligibility.',
-      'The IP country check is done on our server; raw IP is not stored.',
+      'The terms-acceptance record contains your wallet address, the terms version, the UTC time, the country code where available and the country-check result.',
+      'We also record your 18+ confirmation and its UTC time, not your date of birth.',
+      'The country check is done on our server; raw IP is not stored.',
       'Reported RP is sent only with your consent.',
       'You can withdraw consent at any time by contacting the privacy contact.',
       'The RP Estimate panel uses your holdings only.',
@@ -120,10 +122,24 @@ describe('static legal drafts', () => {
       'You must be 18 or over to use ScoutReport.',
     )
     expect(screen.getByRole('main')).toHaveTextContent(
-      'When you accept the terms, we record your wallet address, the terms version, the UTC time and the country-check result.',
+      'When you accept the terms, we record your wallet address, the terms version, the UTC time, the country code where available and the country-check result.',
     )
     expect(screen.getByRole('main')).toHaveTextContent(
       'The IP country check is done on our server; raw IP is not stored.',
     )
+  })
+
+  it('shows the approved free-to-play banner and valueless, non-transferable points', () => {
+    render(<TermsPage />)
+    expect(screen.getByText(NAMES.predict.freeToPlayBanner)).toHaveTextContent(
+      "Predict is free to play. You don't need CHZ, Fan Tokens or Reward Points. Prediction points have no cash value and can't be transferred or redeemed. No prizes are offered.",
+    )
+    expect(screen.getByRole('main')).toHaveTextContent(
+      'No CHZ, Fan Tokens or Reward Points are required.',
+    )
+    expect(screen.getByRole('main')).toHaveTextContent(
+      'Prediction points have no cash value, are non-transferable and cannot be redeemed.',
+    )
+    expect(screen.getByRole('main')).toHaveTextContent('No prizes are offered.')
   })
 })

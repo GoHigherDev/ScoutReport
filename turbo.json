@@ -12,9 +12,12 @@
     "NEXT_PUBLIC_SUBGRAPH_URL_PREDICTIONS",
     "SUBGRAPH_URL_HOLDINGS",
     "SESSION_SECRET",
+    "PREDICT_ERASURE_SECRET",
+    "PREDICT_BLOCKED_COUNTRIES",
     "FEATURE_RP_ESTIMATE",
     "RP_ESTIMATE_LEGAL_SIGNOFF",
     "VERCEL_ENV",
+    "VERCEL",
     "NODE_ENV",
     "RPC_URL_MAINNET",
     "RPC_URL_MAINNET_FALLBACK",
@@ -49,6 +52,7 @@
     },
     "test": {
       "dependsOn": ["^build"],
+      "env": ["PREDICT_TEST_DATABASE_URL", "PGHOST", "PGUSER", "PGPASSWORD"],
       "outputs": []
     }
   }

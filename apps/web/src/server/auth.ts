@@ -59,7 +59,12 @@ export const createAuthRoutes = (options: AuthOptions = {}) => {
       const now = new Date()
       const expiresAt = new Date(now.getTime() + NONCE_TTL)
       const nonce = randomBytes(32).toString('hex')
-      await nonceStore.issue(nonce, expiresAt, now)
+      await nonceStore.issue(
+        nonce,
+        expiresAt,
+        now,
+        (await getVerifiedSession(request))?.address,
+      )
       session.nonce = nonce
       await session.save()
       return Response.json(
@@ -131,7 +136,10 @@ export const createAuthRoutes = (options: AuthOptions = {}) => {
           nonce: parsed.nonce,
           time: now,
         })
-        if (!valid || !(await nonceStore.consume(parsed.nonce, new Date()))) {
+        if (
+          !valid ||
+          !(await nonceStore.consume(parsed.nonce, new Date(), address))
+        ) {
           throw invalid()
         }
         delete session.nonce

@@ -36,12 +36,17 @@ export const profiles = pgTable(
   ],
 )
 
-export const siweNonces = pgTable('siwe_nonces', {
-  nonce: text('nonce').primaryKey(),
-  createdAt: time('created_at').notNull().defaultNow(),
-  expiresAt: time('expires_at').notNull(),
-  usedAt: time('used_at'),
-})
+export const siweNonces = pgTable(
+  'siwe_nonces',
+  {
+    nonce: text('nonce').primaryKey(),
+    address: text('address'),
+    createdAt: time('created_at').notNull().defaultNow(),
+    expiresAt: time('expires_at').notNull(),
+    usedAt: time('used_at'),
+  },
+  (table) => [index('siwe_nonces_address').on(table.address)],
+)
 
 export const adminAuditLog = pgTable(
   'admin_audit_log',
@@ -55,7 +60,7 @@ export const adminAuditLog = pgTable(
   (table) => [
     check(
       'admin_audit_log_actor_lowercase',
-      sql`${table.actorAddress} ~ '^0x[0-9a-f]{40}$'`,
+      sql`${table.actorAddress} ~ '^(0x[0-9a-f]{40}|erased:[0-9a-f]{64})$'`,
     ),
   ],
 )
@@ -113,7 +118,7 @@ export const matches = pgTable(
     ),
     check(
       'matches_created_by_lowercase',
-      sql`${table.createdBy} ~ '^0x[0-9a-f]{40}$'`,
+      sql`${table.createdBy} ~ '^(0x[0-9a-f]{40}|erased:[0-9a-f]{64})$'`,
     ),
     uniqueIndex('matches_id_created').on(table.createdAt, table.id),
   ],
@@ -127,11 +132,13 @@ export const picks = pgTable(
       .references(() => matches.id, { onDelete: 'cascade' }),
     address: text('address').notNull(),
     outcome: text('outcome').notNull(),
+    signature: text('signature'),
     createdAt: time('created_at').notNull().defaultNow(),
     updatedAt: time('updated_at').notNull().defaultNow(),
   },
   (table) => [
     primaryKey({ columns: [table.matchId, table.address] }),
+    index('picks_address').on(table.address),
     check(
       'picks_address_lowercase',
       sql`${table.address} ~ '^0x[0-9a-f]{40}$'`,
@@ -159,10 +166,73 @@ export const predictionPoints = pgTable(
       table.weekStartUtc,
       table.address,
     ),
+    index('prediction_points_address').on(table.address),
     check(
       'prediction_points_address_lowercase',
       sql`${table.address} ~ '^0x[0-9a-f]{40}$'`,
     ),
     check('prediction_points_positive', sql`${table.points} > 0`),
+  ],
+)
+
+export const predictAgeConfirmations = pgTable('predict_age_confirmations', {
+  address: text('address').primaryKey(),
+  confirmedAt: time('confirmed_at').notNull().defaultNow(),
+})
+
+export const predictTermsAcceptances = pgTable(
+  'predict_terms_acceptances',
+  {
+    address: text('address').notNull(),
+    version: text('version').notNull(),
+    country: text('country'),
+    countryCheck: text('country_check')
+      .$type<'allowed' | 'unknown'>()
+      .notNull(),
+    acceptedAt: time('accepted_at').notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.address, table.version] })],
+)
+
+export const predictNonces = pgTable(
+  'predict_nonces',
+  {
+    nonce: text('nonce').primaryKey(),
+    address: text('address').notNull(),
+    expiresAt: time('expires_at').notNull(),
+  },
+  (table) => [index('predict_nonces_address').on(table.address)],
+)
+
+export const predictRateLimits = pgTable(
+  'predict_rate_limits',
+  {
+    address: text('address').primaryKey(),
+    count: integer('count').notNull(),
+    expiresAt: time('expires_at').notNull(),
+  },
+  (table) => [index('predict_rate_limits_expiry').on(table.expiresAt)],
+)
+
+export const predictionAudit = pgTable(
+  'prediction_audit',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    address: text('address').notNull(),
+    matchId: uuid('match_id').notNull(),
+    outcome: text('outcome').notNull(),
+    signature: text('signature'),
+    createdAt: time('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      'prediction_audit_address',
+      sql`${table.address} ~ '^(0x[0-9a-f]{40}|erased:[0-9a-f]{64})$'`,
+    ),
+    check(
+      'prediction_audit_erased_signature',
+      sql`${table.address} LIKE '0x%' OR ${table.signature} IS NULL`,
+    ),
+    index('prediction_audit_address_index').on(table.address),
   ],
 )

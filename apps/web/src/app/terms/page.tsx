@@ -10,6 +10,8 @@ export default function TermsPage() {
       heading={NAMES.legal.termsHeading}
       sections={NAMES.legal.termsSections}
       details={LEGAL_DETAILS}
-    />
+    >
+      <p>{NAMES.predict.freeToPlayBanner}</p>
+    </LegalNotice>
   )
 }

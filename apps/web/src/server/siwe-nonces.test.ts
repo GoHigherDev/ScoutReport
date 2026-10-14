@@ -37,10 +37,11 @@ describe('SIWE nonce persistence', () => {
 
   it('reads one nonce with its timestamp and use state', async () => {
     returnedRows = [
-      ['testnonce', now.toISOString(), expiresAt.toISOString(), null],
+      ['testnonce', null, now.toISOString(), expiresAt.toISOString(), null],
     ]
     expect(await nonceStore.find('testnonce')).toEqual({
       nonce: 'testnonce',
+      address: null,
       createdAt: now,
       expiresAt,
       usedAt: null,
