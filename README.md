@@ -455,6 +455,59 @@ See the [settlement runbook](docs/runbooks/settlement.md) for official-result
 verification, immutable settlement, resumable crediting, subgraph/leaderboard
 checks, voids and disputes. All new console copy is under `NAMES.admin`.
 
+## Off-chain Predict (SR-45)
+
+`/predict` lists Postgres matches as Upcoming, Locked and Settled, with kickoff
+and lock times displayed in Europe/London. My `[PREDICTIONS_TAB_NAME]` shows the
+signed-in wallet's picks, results, points per match and total points. The existing
+free-to-play banner remains visible, including during sign-in and errors.
+
+Before picking, sign in with SIWE, confirm that you are 18 or over and accept
+the current terms. SR-41 checks the trusted server-side country on each pick
+and fails closed for unknown countries in production. All Predict APIs require
+a verified session before database work. Match, personal-prediction and
+eligibility reads share a separate Postgres per-account limit of 20 requests
+per minute; nonce, pick and acceptance writes retain their own shared
+20-per-minute limit. Paging does not consume the write allowance.
+Write requests must come from `NEXT_PUBLIC_SITE_URL`.
+`GET /api/predict/matches` and `GET /api/predict/mine` are paginated;
+the latter also returns the wallet's total points independently of pagination.
+`GET /api/predict/eligibility` supplies the current terms version and gate state.
+The existing age-confirmation and terms-acceptance endpoints record those gates.
+The existing SIWE routes still fail closed in production until their shared
+auth limiter and trusted identity resolver are wired in; this ticket does not
+weaken those unauthenticated-route guards.
+
+Each pick or change requires an EIP-712 wallet signature binding the match,
+outcome and a single-use server nonce. Verification supports EOAs and ERC-1271
+wallets on the session chain. This is not a transaction: no gas, funds moved,
+network guard, contract deployment or subgraph is involved. The server checks
+the nonce and match without locks, then verifies the signature before opening
+the write transaction, so ERC-1271 RPC calls do not hold wallet or match locks.
+Inside the transaction it locks the match row, rechecks eligibility and the
+server deadline, refuses submissions at or after `lock_at_utc`, consumes the nonce
+and atomically saves the pick and signed append-only audit event. Request a
+challenge using `POST /api/predict/nonce` with `{ matchId, outcome }`, sign the
+typed data, then send `{ matchId, outcome, nonce, signature }` to
+`POST /api/predict/picks`. Challenges expire after ten minutes; requesting a new
+one replaces the wallet's previous challenge. Points come
+from SR-44 scoring and have no cash value; no prizes are offered.
+
+Apply migrations with `pnpm db:migrate`, including
+`0004_predict_wallet_serialisation.sql` for first-pick/erasure serialisation
+and `0005_predict_read_limit_erasure.sql` for erasure of both rate-limit buckets.
+Reuse the SIWE configuration,
+`DATABASE_URL`, `NEXT_PUBLIC_SITE_URL` and SR-41 country/erasure settings;
+never put secrets in browser configuration. `erasePredictData(address, tx)`
+deletes picks, points, both rate-limit buckets and wallet-linked nonces and
+removes recoverable signatures while pseudonymising retained audit entries.
+
+For real Postgres signature, lock and erasure tests, set
+`PREDICT_TEST_DATABASE_URL` to a dedicated disposable local database before
+running `pnpm turbo run lint typecheck test build`. These tests apply migrations;
+never point them at production. UI wording is centralised in `NAMES.predict`
+and requires Content Writer review before merge.
+
 ## Repository map
 
 | Path                 | Purpose                                               |

@@ -11,11 +11,14 @@ import {
   HoldingsStrip,
   NetworkBadge,
   WalletButton,
+  WalletChainPanels,
   WrongNetworkBanner,
 } from './components'
 import { NAMES } from '../copy/names'
 
 const mocks = vi.hoisted(() => ({
+  pathname: '/',
+  holdingsHook: vi.fn(),
   connection: {
     isConnected: false,
     address: '0x123400000000000000000000000000000000abcd',
@@ -33,6 +36,7 @@ const mocks = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
 }))
+vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname }))
 vi.mock('wagmi', () => ({
   useConnection: () => mocks.connection,
   useDisconnect: () => ({
@@ -42,7 +46,7 @@ vi.mock('wagmi', () => ({
   useConnectorClient: mocks.connectorClient,
 }))
 vi.mock('./providers', () => ({ useWalletModal: () => mocks.modal }))
-vi.mock('./hooks', () => ({ useHoldings: () => mocks.holdings }))
+vi.mock('./hooks', () => ({ useHoldings: mocks.holdingsHook }))
 vi.mock('@scoutreport/chain', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@scoutreport/chain')>()),
   ensureChain: mocks.ensureChain,
@@ -51,6 +55,8 @@ vi.mock('@scoutreport/chain', async (importOriginal) => ({
 beforeEach(() => {
   vi.resetAllMocks()
   vi.stubEnv('NEXT_PUBLIC_APP_CHAIN_ID', '88882')
+  mocks.pathname = '/'
+  mocks.holdingsHook.mockImplementation(() => mocks.holdings)
   mocks.connection.isConnected = false
   mocks.connection.chainId = 88882
   mocks.modal.available = true
@@ -66,6 +72,60 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.unstubAllEnvs()
+})
+
+describe('route-scoped wallet shell', () => {
+  it.each(['/predict', '/predict/'])(
+    'does not mount chain panels, holdings RPC hooks or network prompts on %s',
+    (pathname) => {
+      mocks.pathname = pathname
+      mocks.connection.isConnected = true
+      mocks.connection.chainId = 1
+      render(
+        <>
+          <WalletButton />
+          <WalletChainPanels />
+        </>,
+      )
+      expect(
+        screen.getByRole('button', { name: NAMES.wallet.disconnect }),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByText(NAMES.wallet.unsupportedNetwork),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByText(NAMES.wallet.wrongNetwork),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('region', { name: NAMES.wallet.holdings }),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: NAMES.gas.signIn }),
+      ).not.toBeInTheDocument()
+      expect(mocks.holdingsHook).not.toHaveBeenCalled()
+      expect(mocks.connectorClient).not.toHaveBeenCalled()
+    },
+  )
+
+  it('preserves the existing chain panels on other routes and unmounts them on Predict navigation', () => {
+    mocks.pathname = '/optimiser'
+    mocks.connection.isConnected = true
+    mocks.connection.chainId = 1
+    const { rerender } = render(<WalletChainPanels />)
+    expect(screen.getByText(NAMES.wallet.wrongNetwork)).toBeInTheDocument()
+    expect(
+      screen.getByRole('region', { name: NAMES.wallet.holdings }),
+    ).toBeInTheDocument()
+    mocks.holdingsHook.mockClear()
+    mocks.connectorClient.mockClear()
+    mocks.pathname = '/predict'
+    rerender(<WalletChainPanels />)
+    expect(
+      screen.queryByText(NAMES.wallet.wrongNetwork),
+    ).not.toBeInTheDocument()
+    expect(mocks.holdingsHook).not.toHaveBeenCalled()
+    expect(mocks.connectorClient).not.toHaveBeenCalled()
+  })
 })
 
 describe('wallet controls', () => {
