@@ -8,7 +8,7 @@ export const NAMES = {
     accessRequired: 'Sign in with an approved admin wallet to manage matches.',
     forbidden: 'This session does not have admin access.',
     refresh: 'Refresh matches',
-    reopen: 'Open the console after signing in',
+    reopen: 'Sign in, then open the console',
     findMatch: 'Match ID',
     find: 'Find match',
     latest: 'Latest 100 matches',
@@ -38,7 +38,7 @@ export const NAMES = {
     create: 'Create match',
     settle: 'Settle match',
     void: 'Void match',
-    credit: 'Credit / recalculate points',
+    credit: 'Credit or recalculate points',
     result: 'Result',
     confirmHeading: 'Confirm match action',
     confirmHelp:
