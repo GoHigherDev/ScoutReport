@@ -1,8 +1,79 @@
 const externalWalletCaveat =
   'Staking from an external wallet does not earn Socios Reward Points. We cannot reliably verify whether this address is a Socios Wallet or qualifies for RP.'
 
+export const LEGAL_DETAILS = {
+  contact: '[PRIVACY CONTACT — TO BE CONFIRMED]',
+  controller: '[DATA CONTROLLER — TO BE CONFIRMED]',
+  retention: '[RETENTION PERIOD — TO BE CONFIRMED]',
+} as const
+
 export const NAMES = {
   product: 'ScoutReport',
+  legal: {
+    draft: 'Draft, pending legal review',
+    controller: 'Data controller',
+    contact: 'Privacy contact',
+    privacyHeading: 'Privacy notice',
+    termsHeading: 'Terms',
+    privacySections: [
+      {
+        heading: 'Data collected and purposes',
+        text: 'ScoutReport uses a wallet address to identify a profile and verify sign-in. Off-chain profile fields include an optional public name, a holdings-display preference, claim chain and time, and the latest update time. Sign-in uses a single-use nonce, wallet signature and message; signatures and messages are not logged. Public wallet balances and staking history are read from Chiliz Chain to display holdings and estimates; they are not stored in the profile database.',
+      },
+      {
+        heading: 'Wallet addresses and public history',
+        text: 'A wallet address can be personal data when linked to a person, as discussed in ICO guidance on distributed ledger technology. Truncating an address does not make it anonymous. Chiliz Chain history is public and cannot be erased by ScoutReport. Erasure can delete off-chain profile fields and stored picks and signatures, not transactions or history on-chain.',
+      },
+      {
+        heading: 'Lawful bases',
+        text: '[LAWFUL BASIS FOR PROFILES AND SIGN-IN — TO BE CONFIRMED]. [LAWFUL BASIS FOR PUBLIC CHAIN READS — TO BE CONFIRMED]. These are review placeholders, not legal conclusions or regulator approval.',
+      },
+      {
+        heading: 'Off-chain Predict',
+        text: 'Picks are free and wallet-signed using EIP-712: a free signature, no gas and no on-chain transaction. The intended Postgres record contains the wallet address, pick, signature and timestamps, to verify the submission, enforce pick deadlines and calculate non-transferable prediction points. [LAWFUL BASIS FOR PREDICT — TO BE CONFIRMED]. Erasure deletes stored picks and their signatures. Signature persistence is part of SR-45; the current pick schema has no signature field. Terms-acceptance records and audit-log details remain placeholders for SR-41 / P-01.',
+      },
+      {
+        heading: 'Retention',
+        text: 'Profile fields currently remain until explicitly deleted or replaced; no automatic profile purge is implemented. Sign-in nonces expire after ten minutes and expired rows are deleted when another nonce is issued, not by a scheduled purge. The session cookie expires after seven days or is cleared on logout. Predict picks and signatures have a retention period awaiting confirmation. Backup disposal and hosting-log retention also await confirmation; expiry alone does not delete database rows.',
+      },
+      {
+        heading: 'Profile display',
+        text: 'Addresses are truncated by default. Public names are shown only for claimed, visible profiles. Public holdings display requires an explicit opt-in; the profile preference and erasure controls will be implemented in SR-23 / S-05. The connected-wallet portfolio is a private view, not a public profile.',
+      },
+      {
+        heading: 'Cookies and browser storage',
+        text: 'ScoutReport uses only an essential sign-in session cookie, with httpOnly, Secure and SameSite=Lax settings. No analytics or tracking is enabled; any future non-essential tracking would require prior consent. Wallet connection libraries may use browser storage to maintain a connection. The optional Reward Point declaration is stored only in this browser, per wallet, until changed or site storage is cleared; it is not transmitted. Read caches last only for the browser context or until evicted.',
+      },
+      {
+        heading: 'Recipients and infrastructure',
+        text: 'Hosting and database providers process off-chain data. RPC providers receive wallet addresses used in public chain reads, and wallet connection providers support connections. [PROVIDER IDENTITIES, PROCESSING LOCATIONS AND TRANSFER SAFEGUARDS — TO BE CONFIRMED]. No private keys are collected by ScoutReport.',
+      },
+      {
+        heading: 'Your rights and requests',
+        text: 'You can contact the privacy contact to request access, correction, erasure, restriction or portability of your personal data, or to object to processing. Where processing relies on consent, you can withdraw it. The applicable rights and any limits depend on the processing and lawful basis, which remain under review. Wallet control must be verified without requesting private keys. DELETE /api/profile is a documented future contract, not an available endpoint; SR-23 will implement it.',
+      },
+      {
+        heading: 'Complaints',
+        text: 'You can raise a privacy concern with the privacy contact and can complain to the UK Information Commissioner’s Office (ICO). This draft does not claim ICO approval.',
+      },
+    ],
+    predictRetention: 'Predict retention period',
+    icoLink: 'ICO: make a data protection complaint',
+    termsSections: [
+      {
+        heading: 'Independent service',
+        text: 'ScoutReport is a third-party dapp on Chiliz Chain, not affiliated with Socios.com.',
+      },
+      {
+        heading: 'No financial advice',
+        text: 'Information shown is for general information only, not financial or investment advice. Figures and estimates may be incomplete or unavailable. You are responsible for checking information before making decisions; no rewards or returns are promised.',
+      },
+      {
+        heading: 'Draft scope',
+        text: 'This is a terms stub pending legal review. [SERVICE TERMS, ELIGIBILITY AND GOVERNING LAW — TO BE CONFIRMED]. Predict picks are free, off-chain and wallet-signed with no gas. Full Predict terms and terms-acceptance records will be completed in SR-41 / P-01.',
+      },
+    ],
+  },
   admin: {
     heading: 'Admin matches',
     accessRequired: 'Sign in with an approved admin wallet to manage matches.',

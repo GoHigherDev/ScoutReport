@@ -14,8 +14,9 @@ SIWE enforces single use and a ten-minute nonce expiry; new nonce issuance delet
 including consumed rows. There is no scheduled deletion or automatic database
 TTL, so expired rows remain until another nonce is issued. The following
 retention descriptions document actual behaviour, not an approved production
-retention policy. F-12 must define and implement
-production retention, erasure and backup disposal before personal data is
+retention policy. SR-17 / F-12 drafts the notice and erasure contract; SR-23
+implements erasure. Approved production retention and backup disposal are
+still required before personal data is
 collected in production. Expiry timestamps alone do not delete rows.
 
 | Table / field                                    | Purpose                                                               | Current retention                                     |
@@ -55,8 +56,16 @@ collected in production. Expiry timestamps alone do not delete rows.
 
 The `matches` table stores off-chain fixture metadata and lifecycle state;
 there are no chain IDs, derived contract match IDs or transaction hashes.
-`picks` stores the current pick for each wallet/match without signatures or
-nonces; SR-45 owns those fields. `prediction_points` is replaced by the
+`picks` currently stores the current pick for each wallet/match without signatures or
+nonces; SR-45 owns those fields. The intended Predict record includes the wallet
+address, pick, EIP-712 signature and timestamps in Postgres. Picks use a free
+wallet signature, with no gas or on-chain submission. They support submission
+verification, deadline enforcement and scoring. The lawful basis is pending
+legal review; the draft retention value is `LEGAL_DETAILS.retention` in
+`apps/web/src/copy/names.ts`, not an invented duration. Erasure must delete
+stored picks **and their signatures**, including signature fields added by SR-45.
+Terms-acceptance records and full audit-log notice details remain for SR-41 / P-01.
+`prediction_points` is replaced by the
 idempotent SR-44 scoring function and stores only correct picks. Their
 retention, erasure and backup disposal follow SR-41; SR-44 adds no automatic
 deletion.
@@ -132,3 +141,60 @@ wallet holdings/account-context reads are unchanged.
 calibration list is empty: no real theta, individual reports, reporter addresses,
 RP balance/history or pool values have been provided or persisted by this work.
 Only synthetic test fixtures contain illustrative RP parameters.
+
+## SR-17 draft legal notice and display rules
+
+`/privacy` and `/terms` are static drafts, marked “Draft, pending legal review”.
+All legal copy and the shared controller/contact/retention placeholders live in
+`apps/web/src/copy/names.ts`. No approved controller, contact, lawful basis,
+production retention schedule, provider/transfer assessment or backup-disposal
+policy has been supplied. The notice must not be treated as legal approval.
+
+Wallet addresses can be personal data when linked to a person, as discussed in
+ICO distributed-ledger guidance; truncation is not anonymisation. Shared
+`AddressDisplay` truncates addresses and shows a name only when the profile is
+claimed and explicitly visible. `ProfileHoldings` defaults to hidden and requires
+claim, visibility and `showHoldings` opt-in. Public profile consumers must use
+these safeguards and avoid fetching/serialising hidden holdings in the first
+place; a rendering guard is not server-side access control. The existing
+connected-wallet holdings/optimiser is the user's private view, not public
+publication. SR-23 owns preference persistence and toggle UI.
+
+Only the essential SIWE session cookie is used by the app; AppKit analytics is
+disabled. `apps/web/src/privacy-guardrails.test.ts` prevents known tracker
+packages/scripts and duplicated shared legal placeholders.
+
+## DELETE /api/profile contract (SR-23 / S-05 implementation, not available yet)
+
+- **Request:** same-origin `DELETE /api/profile`, no body or address parameter.
+  Derive the target address only from the verified SIWE session, never from
+  client-supplied identity. Require the encrypted session cookie and a valid
+  seven-day `issuedAt` lifetime. Verify the request Origin against the configured
+  site origin to prevent cross-site requests; reject a missing/untrusted Origin.
+- **Cost protection:** apply the shared production rate limiter and trusted
+  rate-limit key resolver before any session-dependent DB work. Fail closed
+  when these are absent; no unauthenticated request may trigger paid DB/RPC
+  work. This action needs no RPC call or on-chain transaction.
+- **Deletion:** atomically delete the profile row (`address`, `username`,
+  `show_holdings`, `claimed_chain_id`, `claimed_at`, `updated_at`), all picks
+  belonging to that wallet, their stored signatures (including future SR-45
+  signature/nonce records) and related `prediction_points` rows. Invalidate
+  derived off-chain public-profile caches. Delete dependent records even if the
+  profile row is already absent; do not leave orphaned signatures.
+- **Response:** `204 No Content`, empty body, `Cache-Control: no-store`; clear
+  the session cookie after a successful commit. Repeating deletion with a valid
+  session is idempotent; the cleared cookie requires sign-in for another call.
+  Missing/invalid/expired session: `401`; untrusted Origin: `403`; rate limit:
+  `429` with `Retry-After`; unexpected failure: generic `500`, with no partial
+  deletion, cookie clearing or sensitive error detail. Follow the existing
+  `{ code, message }` error shape.
+- **Limits:** on-chain transactions, balances and history cannot be erased.
+  Fixture metadata and append-only admin audit records are not deleted by this
+  profile action. Audit retention/rights handling requires legal review and must
+  respect the database's immutable audit constraints; do not promise blanket
+  deletion. Terms-acceptance retention/erasure will be specified in SR-41.
+  No automatic database TTL exists; production must separately approve and
+  implement backup expiry/disposal and prevent restored backups from republishing
+  deleted data. Browser-only declarations can be removed by clearing site storage.
+- **Scope:** this section defines the future contract only. SR-17 adds no route,
+  profile toggle, schema change, private key or on-chain write.

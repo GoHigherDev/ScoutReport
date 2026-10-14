@@ -36,6 +36,24 @@ and fill in only values for services you have configured. Set
 `NEXT_PUBLIC_SITE_URL` to the public site origin for production Open Graph links;
 it defaults to `http://localhost:3000` when left empty. Do not commit secrets.
 
+## Draft privacy and terms (SR-17)
+
+`/privacy` and `/terms` are static pages marked “Draft, pending legal review”.
+Legal copy and single-source controller/contact/retention placeholders are in
+`apps/web/src/copy/names.ts`; they require copy-owner and legal review before
+production. See [the data inventory](docs/data-inventory.md) for current
+retention and the future `DELETE /api/profile` contract, including deletion of
+off-chain picks and their signatures. SR-23 implements erasure and preferences;
+SR-41 completes Predict terms-acceptance and audit details. On-chain history
+cannot be erased.
+
+Shared `AddressDisplay` shows truncated addresses unless a claimed, visible
+profile has a name. Public holdings consumers must use the opt-in
+`ProfileHoldings` guard and enforce visibility before fetching/serialising data.
+The connected-wallet portfolio remains a private view. Tests prevent duplicated
+legal placeholders and known tracking packages/scripts; AppKit analytics remains
+disabled.
+
 ## Wallet shell
 
 Set `NEXT_PUBLIC_REOWN_PROJECT_ID` in the ignored `apps/web/.env.local` and
