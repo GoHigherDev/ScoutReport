@@ -4,3 +4,4 @@ export const runtime = 'nodejs'
 const routes = createMatchRoutes()
 export const GET = routes.GET
 export const POST = routes.POST
+export const PATCH = routes.PATCH

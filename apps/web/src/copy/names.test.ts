@@ -1,6 +1,16 @@
 import { expect, it } from 'vitest'
 import { NAMES } from './names'
 
+it('uses the approved off-chain settlement confirmation wording', () => {
+  expect(NAMES.admin.confirmHelp).toBe(
+    'Check the match and result against an official source before you confirm. Settlement is final, so a settled match cannot be corrected or voided.',
+  )
+  expect(NAMES.admin).not.toHaveProperty('unavailable')
+  expect(Object.values(NAMES.admin).join(' ')).not.toMatch(
+    /Spicy|wallet batch/i,
+  )
+})
+
 it('preserves the approved SIWE statement and sign-in error wording', () => {
   expect(NAMES.auth).toEqual({
     statement: 'Sign in to ScoutReport. This does not cost gas or move funds.',
