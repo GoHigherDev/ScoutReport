@@ -1,6 +1,14 @@
 import { expect, it } from 'vitest'
 import { NAMES } from './names'
 
+it('preserves the approved SIWE statement and sign-in error wording', () => {
+  expect(NAMES.auth).toEqual({
+    statement: 'Sign in to ScoutReport. This does not cost gas or move funds.',
+    sessionRequired: 'A session is required',
+    unexpectedError: 'An unexpected error occurred',
+  })
+})
+
 const bannedPhrases = [
   'buy',
   'cheapest',

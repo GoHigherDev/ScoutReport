@@ -52,7 +52,9 @@ and display only non-zero held/staked amounts. Metadata and decimals come from
 `readTokenMeta`; Scout Rating is held + staked. Staking refreshes use read-only
 `eth_call`, never a transaction. Staked amounts are not Reward Points.
 `useWalletKind()` checks code on DATA_CHAIN for future ERC-1271 flows; it does
-not identify a wallet brand. No SIWE or Partner API is included.
+not identify a wallet brand. SR-14 adds a minimal [SIWE sign-in helper and auth
+routes](docs/auth.md), using personal_sign and read-only ERC-1271 verification.
+No Partner API is included.
 
 See [the manual wallet QA matrix](docs/qa/wallet.md) for desktop/mobile checks.
 
@@ -177,8 +179,8 @@ Tests use mocked reads, never live RPC.
 
 The API uses Next.js Node.js route handlers and Drizzle with standard Postgres
 `DATABASE_URL` connections. The schema lives in `apps/web/src/server/db/schema.ts`;
-committed Drizzle migrations live in `drizzle/`. No SIWE sign-in or feature
-tables are implemented in this scaffold.
+committed Drizzle migrations live in `drizzle/`. SIWE authentication reuses the
+existing nonce table; see [the auth flow and configuration](docs/auth.md).
 
 For local database work, install Docker Compose and run from the repository root:
 

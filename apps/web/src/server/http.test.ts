@@ -41,6 +41,7 @@ describe('HTTP handler', () => {
     const forbidden = handler({}, () => {
       throw new HttpError(403, 'FORBIDDEN', 'Admin access is required')
     })
+
     const response = await forbidden(new Request('http://localhost'))
     expect(response.status).toBe(403)
     expect(await response.json()).toEqual({
@@ -54,6 +55,29 @@ describe('HTTP handler', () => {
     expect(failed.status).toBe(500)
     expect(await failed.text()).not.toContain('private connection details')
   })
+
+  it.each([false, true])(
+    'bounds JSON bodies with a declared length: %s',
+    async (declared) => {
+      const run = vi.fn()
+      const route = handler(
+        { schema: z.object({ value: z.string() }), maxBodyBytes: 32 },
+        run,
+      )
+      const body = JSON.stringify({ value: 'é'.repeat(30) })
+      const response = await route(
+        new Request('http://localhost', {
+          method: 'POST',
+          body,
+          headers: declared
+            ? { 'Content-Length': String(Buffer.byteLength(body)) }
+            : {},
+        }),
+      )
+      expect(response.status).toBe(413)
+      expect(run).not.toHaveBeenCalled()
+    },
+  )
 
   it.each(['POST', 'PUT', 'PATCH', 'DELETE', 'GET'])(
     'limits write and auth routes before parsing: %s',

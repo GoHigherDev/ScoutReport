@@ -3,6 +3,11 @@ const externalWalletCaveat =
 
 export const NAMES = {
   product: 'ScoutReport',
+  auth: {
+    statement: 'Sign in to ScoutReport. This does not cost gas or move funds.',
+    sessionRequired: 'A session is required',
+    unexpectedError: 'An unexpected error occurred',
+  },
   xHandle: '@xScoutReport',
   scoreLabel: 'Scout Rating',
   tiers: {
