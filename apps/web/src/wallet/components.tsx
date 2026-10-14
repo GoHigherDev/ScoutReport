@@ -62,7 +62,9 @@ export function WalletButton() {
     <div>
       <div className="flex flex-wrap items-center gap-2">
         <NetworkBadge />
-        {isConnected && address && <AddressDisplay address={address} />}
+        {isConnected && address && (
+          <AddressDisplay address={address} showFullAddressTitle />
+        )}
         <Button
           type="button"
           disabled={isPending || (!isConnected && !available)}

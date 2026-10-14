@@ -7,9 +7,22 @@ afterEach(cleanup)
 const address = `0x${'1234'.repeat(10)}`
 
 describe('public profile display', () => {
-  it('truncates addresses by default', () => {
-    render(<AddressDisplay address={address} />)
+  it('truncates unclaimed addresses without exposing the full address in the DOM', () => {
+    const { container } = render(<AddressDisplay address={address} />)
+    expect(screen.getByText('0x1234…1234').hasAttribute('title')).toBe(false)
+    expect(container.innerHTML).not.toContain(address)
+  })
+
+  it('includes the full-address tooltip only with an explicit opt-in', () => {
+    render(<AddressDisplay address={address} showFullAddressTitle />)
     expect(screen.getByText('0x1234…1234').getAttribute('title')).toBe(address)
+  })
+
+  it('keeps the full-address tooltip absent with an explicit opt-out', () => {
+    const { container } = render(
+      <AddressDisplay address={address} showFullAddressTitle={false} />,
+    )
+    expect(container.innerHTML).not.toContain(address)
   })
 
   it.each([

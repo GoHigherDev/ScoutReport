@@ -178,7 +178,9 @@ the draft and contract only, not the existing backend or RP panel behaviour.
 Wallet addresses can be personal data when linked to a person, as discussed in
 ICO distributed-ledger guidance; truncation is not anonymisation. Shared
 `AddressDisplay` truncates addresses and shows a name only when the profile is
-claimed and explicitly visible. `ProfileHoldings` defaults to hidden and requires
+claimed and explicitly visible. Its full-address tooltip is absent by default;
+only the connected user's own `WalletButton` opts in with `showFullAddressTitle`.
+`ProfileHoldings` defaults to hidden and requires
 claim, visibility and `showHoldings` opt-in. Public profile consumers must use
 these safeguards and avoid fetching/serialising hidden holdings in the first
 place; a rendering guard is not server-side access control. The existing

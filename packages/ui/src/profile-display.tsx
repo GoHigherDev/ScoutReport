@@ -5,6 +5,7 @@ export type AddressDisplayProps = {
   username?: string | null
   claimed?: boolean
   visible?: boolean
+  showFullAddressTitle?: boolean
 }
 
 export function AddressDisplay({
@@ -12,9 +13,10 @@ export function AddressDisplay({
   username,
   claimed = false,
   visible = false,
+  showFullAddressTitle = false,
 }: AddressDisplayProps) {
   return (
-    <span title={address}>
+    <span title={showFullAddressTitle ? address : undefined}>
       {claimed && visible && username?.trim()
         ? username
         : `${address.slice(0, 6)}…${address.slice(-4)}`}
