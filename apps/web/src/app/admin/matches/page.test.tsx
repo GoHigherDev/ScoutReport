@@ -57,5 +57,5 @@ it('fails closed for an empty allowlist', async () => {
 it('renders the console only for an allowlisted verified session', async () => {
   mocks.session.mockResolvedValue({ address: actor })
   render(await AdminMatchesPage())
-  expect(mocks.console).toHaveBeenCalledWith({ actorAddress: actor })
+  expect(mocks.console).toHaveBeenCalledOnce()
 })

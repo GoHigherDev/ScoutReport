@@ -1,35 +1,23 @@
 'use client'
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useAccount } from 'wagmi'
 import { useQuery } from '@tanstack/react-query'
-import {
-  decodeTxError,
-  FAN_TOKENS,
-  getPredictionsAddress,
-  getPublicClient,
-  SCOUTREPORT_ABIS,
-} from '@scoutreport/chain'
+import { FAN_TOKENS } from '@scoutreport/chain'
 import { Button } from '@scoutreport/ui'
-import { encodeFunctionData, type Address, type Hash, type Hex } from 'viem'
 import { NAMES } from '../copy/names'
+import { MAX_POINTS_PER_CORRECT } from '../lib/admin-match-constants'
 import { matchInputSchema, type AdminMatch } from '../lib/admin-matches'
-import { TransactionButton } from './tx-button'
 
-type Action = 'createMatch' | 'settle' | 'voidMatch' | 'creditPoints'
-type MatchState = {
-  status: number
-  result: number
-  predictorCount: number
-  creditedCursor: number
-}
-type Audit = { matchId: string; action: Action; txHash: Hash }
 const fieldClass =
   'block w-full rounded-md border border-sr-border bg-sr-surface p-2 text-sr-text'
 
-async function api<T>(path: string, body?: unknown): Promise<T> {
+async function api<T>(
+  path: string,
+  method: 'GET' | 'POST' | 'PATCH' = 'GET',
+  body?: unknown,
+): Promise<T> {
   const response = await fetch(path, {
-    method: body ? 'POST' : 'GET',
+    method,
     credentials: 'same-origin',
     cache: 'no-store',
     ...(body
@@ -43,29 +31,30 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
   return response.json()
 }
 
-export function AdminMatches({ actorAddress }: { actorAddress: string }) {
-  const address = getPredictionsAddress()
+export function AdminMatches() {
   const [matchIdInput, setMatchIdInput] = useState('')
   const [lookupId, setLookupId] = useState('')
   const [lookupError, setLookupError] = useState(false)
   const list = useQuery({
-    queryKey: ['admin-matches', actorAddress, lookupId],
+    queryKey: ['admin-matches', lookupId],
     queryFn: () =>
       api<{ matches: AdminMatch[] }>(
-        `/api/admin/matches${lookupId ? `?matchId=${encodeURIComponent(lookupId)}` : ''}`,
+        `/api/admin/matches${lookupId ? `?id=${encodeURIComponent(lookupId)}` : ''}`,
       ),
     retry: false,
     refetchOnWindowFocus: false,
   })
   return (
     <div className="space-y-6">
-      {!address && <p role="status">{NAMES.admin.unavailable}</p>}
-      <NewMatch onSaved={() => list.refetch()} />
+      <MatchForm onSaved={() => list.refetch()} />
       <form
         className="space-y-3"
         onSubmit={(event) => {
           event.preventDefault()
-          const valid = /^0x[0-9a-fA-F]{64}$/.test(matchIdInput)
+          const valid =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+              matchIdInput,
+            )
           setLookupError(!valid)
           if (valid) setLookupId(matchIdInput.toLowerCase())
         }}
@@ -113,26 +102,48 @@ export function AdminMatches({ actorAddress }: { actorAddress: string }) {
         <MatchCard
           key={match.id}
           match={match}
-          address={address}
-          actorAddress={actorAddress}
-          authorised={!list.isError && !list.isFetching}
-          refreshVersion={list.dataUpdatedAt}
+          onSaved={() => list.refetch()}
         />
       ))}
     </div>
   )
 }
 
-function NewMatch({ onSaved }: { onSaved: () => Promise<unknown> }) {
-  const [sport, setSport] = useState<'football' | 'cs2'>('football')
+function londonInput(utc: string) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(new Date(utc))
+      .map(({ type, value }) => [type, value]),
+  )
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
+}
+
+function MatchForm({
+  match,
+  onSaved,
+  onCancel,
+}: {
+  match?: AdminMatch
+  onSaved: () => Promise<unknown>
+  onCancel?: () => void
+}) {
+  const [sport, setSport] = useState<'football' | 'cs2'>(
+    match?.sport ?? 'football',
+  )
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string>()
   const [error, setError] = useState<string>()
-  const running = useRef(false)
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (running.current) return
     const form = event.currentTarget
     const data = new FormData(form)
     const parsed = matchInputSchema.safeParse({
@@ -147,6 +158,7 @@ function NewMatch({ onSaved }: { onSaved: () => Promise<unknown> }) {
         .split('\n')
         .map((value) => value.trim()),
       pointsForCorrect: Number(data.get('points')),
+      externalRef: data.get('externalRef') || null,
     })
     setMessage(undefined)
     setError(undefined)
@@ -154,25 +166,37 @@ function NewMatch({ onSaved }: { onSaved: () => Promise<unknown> }) {
       setError(NAMES.admin.invalidInput)
       return
     }
-    running.current = true
     setSaving(true)
     try {
-      await api('/api/admin/matches', parsed.data)
-      form.reset()
-      setSport('football')
+      if (match) {
+        await api('/api/admin/matches', 'PATCH', {
+          action: 'edit',
+          id: match.id,
+          changes: parsed.data,
+        })
+      } else {
+        await api('/api/admin/matches', 'POST', parsed.data)
+      }
       setMessage(NAMES.admin.saved)
       await onSaved()
+      if (match) onCancel?.()
+      else form.reset()
     } catch {
       setError(NAMES.admin.error)
     } finally {
-      running.current = false
       setSaving(false)
     }
   }
 
+  const initialSides = match?.sides ?? [
+    { name: '', tokenKey: null },
+    { name: '', tokenKey: null },
+  ]
   return (
     <section className="space-y-4 rounded-md border border-sr-border p-4">
-      <h2 className="text-xl font-bold">{NAMES.admin.newMatch}</h2>
+      <h2 className="text-xl font-bold">
+        {match ? NAMES.admin.edit : NAMES.admin.newMatch}
+      </h2>
       <form className="space-y-4" onSubmit={(event) => void save(event)}>
         <fieldset disabled={saving} className="space-y-4">
           <label className="block">
@@ -197,6 +221,7 @@ function NewMatch({ onSaved }: { onSaved: () => Promise<unknown> }) {
                   name={`side${side}`}
                   required
                   maxLength={120}
+                  defaultValue={initialSides[side - 1].name}
                 />
               </label>
               <label>
@@ -205,6 +230,7 @@ function NewMatch({ onSaved }: { onSaved: () => Promise<unknown> }) {
                   key={`${sport}-${side}`}
                   className={fieldClass}
                   name={`token${side}`}
+                  defaultValue={initialSides[side - 1].tokenKey ?? ''}
                 >
                   <option value="">{NAMES.admin.noToken}</option>
                   {FAN_TOKENS.filter(
@@ -227,6 +253,7 @@ function NewMatch({ onSaved }: { onSaved: () => Promise<unknown> }) {
               name="kickoff"
               type="datetime-local"
               required
+              defaultValue={match ? londonInput(match.kickoff) : undefined}
               aria-describedby="admin-time-help"
             />
           </label>
@@ -236,6 +263,7 @@ function NewMatch({ onSaved }: { onSaved: () => Promise<unknown> }) {
               className={fieldClass}
               name="lockTime"
               type="datetime-local"
+              defaultValue={match ? londonInput(match.lockTime) : undefined}
               aria-describedby="admin-time-help"
             />
           </label>
@@ -249,7 +277,8 @@ function NewMatch({ onSaved }: { onSaved: () => Promise<unknown> }) {
               name="outcomes"
               rows={3}
               required
-              maxLength={362}
+              maxLength={602}
+              defaultValue={match?.outcomes.join('\n')}
             />
           </label>
           <label className="block">
@@ -259,12 +288,31 @@ function NewMatch({ onSaved }: { onSaved: () => Promise<unknown> }) {
               name="points"
               type="number"
               min={1}
-              max={100}
+              max={MAX_POINTS_PER_CORRECT}
               step={1}
               required
+              defaultValue={match?.pointsForCorrect}
             />
           </label>
-          <Button type="submit">{NAMES.admin.save}</Button>
+          <label className="block">
+            {NAMES.admin.externalRef}
+            <input
+              className={fieldClass}
+              name="externalRef"
+              maxLength={500}
+              defaultValue={match?.externalRef ?? ''}
+            />
+          </label>
+          <div className="flex gap-2">
+            <Button type="submit">
+              {match ? NAMES.admin.saveChanges : NAMES.admin.save}
+            </Button>
+            {match && (
+              <Button type="button" variant="secondary" onClick={onCancel}>
+                {NAMES.admin.cancel}
+              </Button>
+            )}
+          </div>
         </fieldset>
         {message && <p role="status">{message}</p>}
         {error && <p role="alert">{error}</p>}
@@ -275,290 +323,146 @@ function NewMatch({ onSaved }: { onSaved: () => Promise<unknown> }) {
 
 function MatchCard({
   match,
-  address,
-  actorAddress,
-  authorised,
-  refreshVersion,
+  onSaved,
 }: {
   match: AdminMatch
-  address?: Address
-  actorAddress: string
-  authorised: boolean
-  refreshVersion: number
+  onSaved: () => Promise<unknown>
 }) {
-  const wallet = useAccount()
-  const [result, setResult] = useState(0)
-  const [action, setAction] = useState<Action>()
-  const [pendingAudit, setPendingAudit] = useState<Audit>()
-  const [auditError, setAuditError] = useState(false)
-  const [receiptFailure, setReceiptFailure] = useState(false)
-  const [recording, setRecording] = useState(false)
-  const [transacting, setTransacting] = useState(false)
-  const [recoveryAction, setRecoveryAction] = useState<Action>('createMatch')
-  const [recoveryHash, setRecoveryHash] = useState('')
+  const [action, setAction] = useState<'settle' | 'void' | 'credit'>()
+  const [result, setResult] = useState(match.outcomes[0])
+  const [reason, setReason] = useState('')
+  const [score, setScore] = useState<{
+    creditedCount: number
+    totalPoints: number
+  }>()
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null)
-  const state = useQuery({
-    queryKey: ['admin-match', match.matchId, address, refreshVersion],
-    enabled: Boolean(address) && authorised,
-    queryFn: async (): Promise<MatchState | null> => {
-      try {
-        return (await getPublicClient(88882).readContract({
-          address: address!,
-          abi: SCOUTREPORT_ABIS[0],
-          functionName: 'getMatch',
-          args: [match.matchId as Hex],
-        })) as MatchState
-      } catch (error) {
-        if (
-          decodeTxError(
-            error,
-            { UnknownMatch: NAMES.admin.draft },
-            NAMES.admin.error,
-          ) === NAMES.admin.draft
-        )
-          return null
-        throw error
-      }
-    },
-    retry: false,
-    refetchOnWindowFocus: false,
-  })
-  const walletMatches =
-    wallet.address?.toLowerCase() === actorAddress.toLowerCase() &&
-    wallet.chainId === 88882
-  const ready =
-    Boolean(address) &&
-    authorised &&
-    walletMatches &&
-    state.isSuccess &&
-    !state.isFetching &&
-    !pendingAudit &&
-    !recording &&
-    !transacting
-  const chainState = state.data
-  const remaining = chainState
-    ? chainState.predictorCount - chainState.creditedCursor
-    : 0
   const title = match.sides.map((side) => side.name).join(' / ')
   const actionLabels = {
-    createMatch: NAMES.admin.create,
     settle: NAMES.admin.settle,
-    voidMatch: NAMES.admin.void,
-    creditPoints: NAMES.admin.credit,
+    void: NAMES.admin.void,
+    credit: NAMES.admin.credit,
   }
 
   useEffect(() => {
     if (action) dialog.current?.showModal()
   }, [action])
 
-  async function record(audit: Audit) {
-    setRecording(true)
-    setAuditError(false)
+  async function confirmAction() {
+    if (!action || saving) return
+    setSaving(true)
+    setError(false)
     try {
-      const response = await api<{
-        ok: true
-        receiptStatus: 'success' | 'reverted'
-      }>('/api/admin/matches/audit', audit)
-      if (!['success', 'reverted'].includes(response.receiptStatus)) {
-        throw new Error(NAMES.admin.auditError)
-      }
-      const reverted = response.receiptStatus === 'reverted'
-      setReceiptFailure(reverted)
-      setPendingAudit(undefined)
+      const body =
+        action === 'settle'
+          ? { action, id: match.id, result }
+          : action === 'void'
+            ? { action, id: match.id, reason }
+            : { action, id: match.id }
+      const response = await api<{ score?: typeof score }>(
+        '/api/admin/matches',
+        'PATCH',
+        body,
+      )
+      if (response.score) setScore(response.score)
       setAction(undefined)
       dialog.current?.close()
-      const refreshed = await state.refetch()
-      if (
-        !reverted &&
-        (audit.action === 'settle' || audit.action === 'creditPoints') &&
-        refreshed.data?.status === 2 &&
-        refreshed.data.creditedCursor < refreshed.data.predictorCount
-      ) {
-        setAction('creditPoints')
-      }
+      await onSaved()
     } catch {
-      setPendingAudit(audit)
-      setAuditError(true)
+      setError(true)
     } finally {
-      setRecording(false)
+      setSaving(false)
     }
   }
 
-  function requestFor(selected: Action) {
-    const args =
-      selected === 'createMatch'
-        ? [
-            match.matchId,
-            BigInt(Math.floor(new Date(match.lockTime).getTime() / 1000)),
-            match.outcomes.length,
-            match.pointsForCorrect,
-          ]
-        : selected === 'settle'
-          ? [match.matchId, result]
-          : selected === 'creditPoints'
-            ? [match.matchId, BigInt(Math.min(50, remaining))]
-            : [match.matchId]
-    return {
-      to: address!,
-      data: encodeFunctionData({
-        abi: SCOUTREPORT_ABIS[0],
-        functionName: selected,
-        args,
-      }),
-    }
+  if (editing) {
+    return (
+      <MatchForm
+        key={match.id}
+        match={match}
+        onSaved={onSaved}
+        onCancel={() => setEditing(false)}
+      />
+    )
   }
 
   return (
     <section className="space-y-3 rounded-md border border-sr-border p-4">
       <h2 className="text-xl font-bold">{title}</h2>
-      <p className="break-all text-sm text-sr-muted">{match.matchId}</p>
+      <p className="break-all text-sm text-sr-muted">{match.id}</p>
+      {match.externalRef && <p>{match.externalRef}</p>}
       <p>
         {NAMES.admin.kickoffUtc}: {match.kickoff}
       </p>
       <p>
         {NAMES.admin.lockedUntil}: {match.lockTime}
       </p>
-      {address && state.isPending && <p role="status">{NAMES.admin.loading}</p>}
-      {state.isError && <p role="alert">{NAMES.admin.error}</p>}
-      {!walletMatches && <p>{NAMES.admin.walletMismatch}</p>}
-      {state.isSuccess && (
-        <p role="status">
-          {!chainState
-            ? NAMES.admin.draft
-            : chainState.status === 1
-              ? NAMES.admin.open
-              : chainState.status === 2
-                ? `${NAMES.admin.settled}: ${match.outcomes[chainState.result]}`
-                : NAMES.admin.voided}
-        </p>
+      <p role="status">
+        {match.status === 'settled'
+          ? `${NAMES.admin.settled}: ${match.result}`
+          : match.status === 'voided'
+            ? `${NAMES.admin.voided}: ${match.voidReason}`
+            : match.locked
+              ? `${NAMES.admin.open} — ${NAMES.admin.locked}`
+              : NAMES.admin.open}
+      </p>
+      {match.status === 'open' && (
+        <>
+          <label className="block">
+            {NAMES.admin.result}
+            <select
+              className={fieldClass}
+              value={result}
+              onChange={(event) => setResult(event.target.value)}
+            >
+              {match.outcomes.map((outcome) => (
+                <option key={outcome} value={outcome}>
+                  {outcome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={!match.locked}
+              onClick={() => setAction('settle')}
+            >
+              {NAMES.admin.settle}
+            </Button>
+            <Button variant="secondary" onClick={() => setAction('void')}>
+              {NAMES.admin.void}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={match.locked}
+              onClick={() => setEditing(true)}
+            >
+              {NAMES.admin.edit}
+            </Button>
+          </div>
+          {match.locked && <p>{NAMES.admin.lockedEdit}</p>}
+        </>
       )}
-      <label className="block">
-        {NAMES.admin.result}
-        <select
-          className={fieldClass}
-          value={result}
-          disabled={Boolean(action)}
-          onChange={(event) => setResult(Number(event.target.value))}
-        >
-          {match.outcomes.map((outcome, index) => (
-            <option key={outcome} value={index}>
-              {outcome}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          disabled={
-            !ready ||
-            chainState !== null ||
-            new Date(match.lockTime).getTime() <= Date.now()
-          }
-          onClick={() => setAction('createMatch')}
-        >
-          {NAMES.admin.create}
-        </Button>
-        <Button
-          disabled={
-            !ready ||
-            chainState?.status !== 1 ||
-            new Date(match.lockTime).getTime() > Date.now()
-          }
-          onClick={() => setAction('settle')}
-        >
-          {NAMES.admin.settle}
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={!ready || chainState?.status !== 1}
-          onClick={() => setAction('voidMatch')}
-        >
-          {NAMES.admin.void}
-        </Button>
-        <Button
-          disabled={!ready || chainState?.status !== 2 || remaining <= 0}
-          onClick={() => setAction('creditPoints')}
-        >
+      {match.status !== 'open' && (
+        <Button variant="secondary" onClick={() => setAction('credit')}>
           {NAMES.admin.credit}
         </Button>
-      </div>
-      {chainState?.status === 2 && (
+      )}
+      {score && (
         <p role="status">
-          {remaining === 0
-            ? NAMES.admin.complete
-            : `${NAMES.admin.progress}: ${chainState.creditedCursor} / ${chainState.predictorCount}`}
+          {NAMES.admin.creditedCount}: {score.creditedCount};{' '}
+          {NAMES.admin.totalPoints}: {score.totalPoints}
         </p>
       )}
-      <p className="text-sm text-sr-muted">{NAMES.admin.resumeHelp}</p>
-      {receiptFailure && <p role="alert">{NAMES.gas.failed}</p>}
-      {pendingAudit && (
-        <div className="space-y-2">
-          {auditError && <p role="alert">{NAMES.admin.auditError}</p>}
-          {!auditError && <p role="status">{NAMES.admin.receiptPending}</p>}
-          <p className="break-all">{pendingAudit.txHash}</p>
-          <Button
-            disabled={recording || transacting || !authorised || !walletMatches}
-            onClick={() => void record(pendingAudit)}
-          >
-            {NAMES.admin.retryAudit}
-          </Button>
-        </div>
-      )}
-      <details>
-        <summary>{NAMES.admin.recoverAudit}</summary>
-        <p>{NAMES.admin.recoveryHelp}</p>
-        <label className="block">
-          {NAMES.admin.action}
-          <select
-            className={fieldClass}
-            value={recoveryAction}
-            onChange={(event) =>
-              setRecoveryAction(event.target.value as Action)
-            }
-          >
-            {Object.entries(actionLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          {NAMES.admin.recoveryHash}
-          <input
-            className={fieldClass}
-            value={recoveryHash}
-            onChange={(event) => setRecoveryHash(event.target.value.trim())}
-          />
-        </label>
-        <Button
-          disabled={
-            !address ||
-            !authorised ||
-            !walletMatches ||
-            recording ||
-            transacting ||
-            Boolean(pendingAudit) ||
-            !/^0x[0-9a-fA-F]{64}$/.test(recoveryHash)
-          }
-          onClick={() =>
-            void record({
-              matchId: match.matchId,
-              action: recoveryAction,
-              txHash: recoveryHash as Hash,
-            })
-          }
-        >
-          {NAMES.admin.recoverAudit}
-        </Button>
-      </details>
       <dialog
         ref={dialog}
         aria-labelledby={`confirm-${match.id}`}
         className="max-w-lg space-y-4 rounded-md border border-sr-border bg-sr-bg p-6 text-sr-text backdrop:bg-sr-bg/80"
         onCancel={(event) => {
           event.preventDefault()
-          if (!transacting && !recording) {
+          if (!saving) {
             dialog.current?.close()
             setAction(undefined)
           }
@@ -568,49 +472,52 @@ function MatchCard({
           {NAMES.admin.confirmHeading}
         </h3>
         <p>{title}</p>
-        <p className="break-all text-sm">{match.matchId}</p>
-        {action && <p>{actionLabels[action]}</p>}
+        <p>{action && actionLabels[action]}</p>
         {action === 'settle' && (
           <>
             <p>
-              {NAMES.admin.result}: {match.outcomes[result]}
+              {NAMES.admin.result}: {result}
             </p>
             <p>{NAMES.admin.confirmHelp}</p>
           </>
         )}
-        {action === 'voidMatch' && <p>{NAMES.admin.voidHelp}</p>}
-        {action === 'creditPoints' && <p>{NAMES.admin.creditHelp}</p>}
-        {action && address && (
-          <TransactionButton
-            key={`${action}-${chainState?.creditedCursor ?? 0}`}
-            disabled={!ready}
-            request={requestFor(action)}
-            label={actionLabels[action]}
-            expectedAccount={actorAddress as Address}
-            onBusyChange={setTransacting}
-            onSubmitted={(txHash) => {
-              setPendingAudit({ matchId: match.matchId, action, txHash })
-              setAuditError(false)
-              setReceiptFailure(false)
-            }}
-            onReceipt={async (txHash, status) => {
-              setReceiptFailure(status === 'reverted')
-              const audit = { matchId: match.matchId, action, txHash }
-              setPendingAudit(audit)
-              await record(audit)
-            }}
-          />
+        {action === 'void' && (
+          <>
+            <p>{NAMES.admin.voidHelp}</p>
+            <label className="block">
+              {NAMES.admin.voidReason}
+              <textarea
+                className={fieldClass}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                maxLength={500}
+                required
+              />
+            </label>
+          </>
         )}
-        <Button
-          variant="secondary"
-          disabled={transacting || recording}
-          onClick={() => {
-            dialog.current?.close()
-            setAction(undefined)
-          }}
-        >
-          {NAMES.admin.cancel}
-        </Button>
+        {action === 'credit' && <p>{NAMES.admin.creditHelp}</p>}
+        {error && <p role="alert">{NAMES.admin.error}</p>}
+        <div className="flex gap-2">
+          <Button
+            disabled={
+              saving || (action === 'void' && reason.trim().length === 0)
+            }
+            onClick={() => void confirmAction()}
+          >
+            {action && actionLabels[action]}
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={saving}
+            onClick={() => {
+              dialog.current?.close()
+              setAction(undefined)
+            }}
+          >
+            {NAMES.admin.cancel}
+          </Button>
+        </div>
       </dialog>
     </section>
   )

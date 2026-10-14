@@ -1,15 +1,21 @@
 import { FAN_TOKENS } from '@scoutreport/chain'
 import { z } from 'zod'
+import { MAX_POINTS_PER_CORRECT } from './admin-match-constants'
+export { MAX_POINTS_PER_CORRECT, SEASON_ID } from './admin-match-constants'
 
 export type AdminMatch = {
   id: string
-  matchId: `0x${string}`
   sport: 'football' | 'cs2'
   sides: { name: string; tokenKey: string | null }[]
   kickoff: string
   lockTime: string
   outcomes: string[]
   pointsForCorrect: number
+  externalRef: string | null
+  status: 'open' | 'settled' | 'voided'
+  result: string | null
+  voidReason: string | null
+  locked: boolean
 }
 
 const london = new Intl.DateTimeFormat('en-GB', {
@@ -85,7 +91,8 @@ export const matchInputSchema = z
     kickoff: londonInput,
     lockTime: londonInput.optional(),
     outcomes: z.array(z.string().trim().min(1).max(200)).min(2).max(3),
-    pointsForCorrect: z.number().int().min(1).max(100),
+    pointsForCorrect: z.number().int().min(1).max(MAX_POINTS_PER_CORRECT),
+    externalRef: z.string().trim().max(500).nullable().optional(),
   })
   .strict()
   .superRefine((input, context) => {
