@@ -99,8 +99,12 @@ it('keeps all gas and transaction copy neutral', () => {
     expect(text).not.toMatch(bannedCopy)
   }
 })
-it('centralises Predict copy and its signing domain, preserving the unapproved tab placeholder', () => {
-  expect(NAMES.predict.predictionsTab).toBe('My [PREDICTIONS_TAB_NAME]')
+it('centralises Predict copy and its signing domain with the approved tab and retry wording', () => {
+  expect(NAMES.predict.predictionsTab).toBe('My predictions')
+  expect(NAMES.predict.rateLimited).toBe(
+    'Too many requests. Wait a moment, then try again.',
+  )
+  expect(NAMES.predict.retryAfter).toBe('Seconds until you can try again')
   expect(NAMES.predict.signatureHelp).toMatch(/no funds are moved/i)
   expect(
     pickTypedData('https://scoutreport.test', 88882, {

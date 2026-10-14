@@ -577,7 +577,7 @@ it.each(['upcoming', 'locked'] as const)(
     match.status = status
     setup()
     fireEvent.click(
-      await screen.findByRole('button', { name: 'My [PREDICTIONS_TAB_NAME]' }),
+      await screen.findByRole('button', { name: 'My predictions' }),
     )
     expect(
       await screen.findByText(`${NAMES.predict.yourPick}: HOME`),
